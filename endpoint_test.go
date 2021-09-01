@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	"github.com/julienschmidt/httprouter"
@@ -30,7 +31,7 @@ func (p *testPld) Unmarshal(src []byte) error {
 	*p = v
 	return nil
 }
-func TestHandle(t *testing.T) {
+func TestEndpointHandle(t *testing.T) {
 	type tsts struct {
 		name    string
 		method  string
@@ -169,6 +170,75 @@ func TestHandle(t *testing.T) {
 			}
 			if !bytes.Equal(bst, bs) {
 				t.Fatalf("expected: %s\nGot: %s\n", bst, bs)
+			}
+		})
+	}
+}
+
+type testRW string
+
+func (trw testRW) Header() http.Header {
+	return http.Header{}
+}
+
+func (trw testRW) Write(bs []byte) (int, error) {
+	log.Println(bs)
+	return 0, nil
+}
+
+func (trw testRW) WriteHeader(statusCode int) {}
+
+func TestEndpointReset(t *testing.T) {
+	type tsts struct {
+		name string
+		ep   *endpoint
+	}
+
+	s := ""
+	tt := []tsts{
+		{
+			name: "default",
+			ep: &endpoint{
+				route: "/",
+				handler: func(rc *RequestCtx, p Payload) (Payload, error) {
+					return nil, nil
+				},
+				Payload: &testPld{},
+				rw:      testRW(""),
+				r:       &http.Request{},
+				params:  httprouter.Params{},
+				typ:     reflect.TypeOf(s),
+				val:     reflect.ValueOf(s),
+			},
+		},
+	}
+
+	for _, tst := range tt {
+		t.Run(tst.name, func(t *testing.T) {
+			tst.ep.reset()
+			if tst.ep.route != "" {
+				t.Fatalf("route not empty")
+			}
+			if tst.ep.handler != nil {
+				t.Fatalf("handler not nil")
+			}
+
+			if tst.ep.Payload != nil {
+				t.Fatalf("payload not nil")
+			}
+			if tst.ep.rw != nil {
+				t.Fatalf("rw not nil")
+			}
+
+			if tst.ep.r != nil {
+				t.Fatalf("request not nil")
+			}
+
+			if len(tst.ep.params) != 0 {
+				t.Fatalf("params not nil")
+			}
+			if tst.ep.typ != nil {
+				t.Fatalf("typ not nil")
 			}
 		})
 	}

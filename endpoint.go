@@ -30,7 +30,10 @@ func init() {
 	}
 }
 
-func (ep *endpoint) update(route string, pl Payload, h Handler, rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+func (ep *endpoint) update(
+	route string, pl Payload, h Handler,
+	rw http.ResponseWriter, r *http.Request, p httprouter.Params,
+) {
 	ep.route = route
 	ep.handler = h
 	ep.rw = rw
@@ -51,6 +54,9 @@ func (ep *endpoint) reset() {
 	ep.rw = nil
 	ep.r = nil
 	ep.params = nil
+	ep.route = ""
+	ep.typ = nil
+	ep.val = reflect.Value{}
 }
 
 func (ep *endpoint) handle() {
@@ -81,7 +87,12 @@ func (ep *endpoint) handle() {
 				if ep.val.Kind() == reflect.Ptr {
 					var v reflect.Value
 					if pool, ok := ppm[ep.route]; ok {
-						if v, ok = pool.Get().(reflect.Value); !ok {
+						pv := pool.Get()
+						if pv == nil {
+							panic(fmt.Errorf("route: %s pool returned nil... aaaaaaa", ep.route))
+						}
+						defer pool.Put(pv)
+						if v, ok = pv.(reflect.Value); !ok {
 							panic(fmt.Errorf("route: %s pool returned value thats not reflect.Value... aaaaaaa", ep.route))
 						}
 					} else {
@@ -113,9 +124,9 @@ func (ep *endpoint) handle() {
 	if resp != nil {
 		bs, err := resp.Marshal()
 		if err != nil {
-			log.Println("[ERR] -> Payload.Marshal -> ", err.Error())
+			log.Println("[ERR] -> [response] -> Payload.Marshal -> ", err.Error())
 			if err := errorHandler(rc, ErrInternalServerError); err != nil {
-				log.Println("[ERR] -> responding err")
+				log.Println("[ERR] -> err in responding with auto generated Internal Server Error", err.Error())
 			}
 			return
 		}
