@@ -60,17 +60,6 @@ func (ep *endpoint) reset() {
 }
 
 func (ep *endpoint) handle() {
-	rc, ok := rcPool.Get().(*RequestCtx)
-	if !ok {
-		panic(`rcpool returned something thats not a RequestCtx... aaaaaaaaa!!`)
-	}
-	defer func() {
-		rc.Reset()
-		rcPool.Put(rc)
-	}()
-
-	rc.update(ep.rw, ep.r, ep.params)
-
 	if ep.r.Method == http.MethodPost ||
 		ep.r.Method == http.MethodPut ||
 		ep.r.Method == http.MethodDelete ||
@@ -113,6 +102,17 @@ func (ep *endpoint) handle() {
 			}
 		}
 	}
+
+	rc, ok := rcPool.Get().(*RequestCtx)
+	if !ok {
+		panic(`rcpool returned something thats not a RequestCtx... aaaaaaaaa!!`)
+	}
+	defer func() {
+		rc.Reset()
+		rcPool.Put(rc)
+	}()
+
+	rc.update(ep.rw, ep.r, ep.params)
 
 	resp, err := ep.handler(rc, ep.Payload)
 	if err != nil {

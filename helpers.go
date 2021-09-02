@@ -1,5 +1,11 @@
 package gate
 
+import (
+	"fmt"
+	"runtime"
+	"strings"
+)
+
 const (
 	MIMETextXML                          = "text/xml"
 	MIMETextHTML                         = "text/html"
@@ -431,3 +437,13 @@ var httpStatusMessage = map[int]string{
 // 	"wmv":     "video/x-ms-wmv",
 // 	"avi":     "video/x-msvideo",
 // }
+
+func wrapErr(err error, msgs ...string) error {
+	pc := make([]uintptr, 15)
+	n := runtime.Callers(2, pc)
+	frames := runtime.CallersFrames(pc[:n])
+	frame, _ := frames.Next()
+	src := frame.Function
+	s := strings.Join(append([]string{src}, msgs...), " -> ")
+	return fmt.Errorf("%s -> %s", s, err.Error())
+}
