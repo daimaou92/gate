@@ -9,32 +9,79 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/julienschmidt/httprouter"
 )
 
 type App struct {
+	http.Server
+	info   *Info
 	router *httprouter.Router
-	server *http.Server
+	paths  openapi3.Paths
 }
 
 type AppPanicHandler func(http.ResponseWriter, *http.Request, interface{})
 
 type AppOptions struct {
-	Addr                    string
-	TLSConfig               *tls.Config
-	ReadTimeout             time.Duration
-	ReadHeaderTimeout       time.Duration
-	WriteTimeout            time.Duration
-	IdleTimeout             time.Duration
-	MaxHeaderBytes          int
-	TLSNextProto            map[string]func(*App, *tls.Conn)
-	ConnState               func(net.Conn, http.ConnState)
-	ErrorLog                *log.Logger
-	BaseContext             func(net.Listener) context.Context
-	ConnContext             func(ctx context.Context, c net.Conn) context.Context
-	optionsHandler          http.Handler
-	methodNotAllowedHandler http.Handler
-	panicHandler            AppPanicHandler
+	Info              Info
+	Addr              string
+	TLSConfig         *tls.Config
+	ReadTimeout       time.Duration
+	ReadHeaderTimeout time.Duration
+	WriteTimeout      time.Duration
+	IdleTimeout       time.Duration
+	MaxHeaderBytes    int
+	TLSNextProto      map[string]func(*App, *tls.Conn)
+	ConnState         func(net.Conn, http.ConnState)
+	ErrorLog          *log.Logger
+	BaseContext       func(net.Listener) context.Context
+	ConnContext       func(ctx context.Context, c net.Conn) context.Context
+}
+
+func (ao AppOptions) server() *http.Server {
+	server := http.Server{
+		Addr: ":6666",
+	}
+	if ao.Addr != "" {
+		server.Addr = ao.Addr
+	}
+	if ao.TLSConfig != nil {
+		server.TLSConfig = ao.TLSConfig
+	}
+
+	if int64(ao.ReadTimeout) > 0 {
+		server.ReadTimeout = ao.ReadTimeout
+	}
+
+	if int64(ao.ReadHeaderTimeout) > 0 {
+		server.ReadHeaderTimeout = ao.ReadHeaderTimeout
+	}
+
+	if int64(ao.WriteTimeout) > 0 {
+		server.WriteTimeout = ao.WriteTimeout
+	}
+
+	if int64(ao.IdleTimeout) > 0 {
+		server.IdleTimeout = ao.IdleTimeout
+	}
+
+	if ao.MaxHeaderBytes > 0 {
+		server.MaxHeaderBytes = ao.MaxHeaderBytes
+	}
+
+	if len(ao.TLSNextProto) > 0 {
+		v := map[string]func(*http.Server, *tls.Conn, http.Handler){}
+		for k, f := range ao.TLSNextProto {
+			v[k] = func(s *http.Server, c *tls.Conn, h http.Handler) {
+				a := &App{}
+				a.fromServer(s)
+				a.router = newRouter()
+				a.Handler = a.router
+				f(a, c)
+			}
+		}
+	}
+	return &server
 }
 
 func (a *App) SetMethodNotAllowedHandler(h http.Handler) error {
@@ -90,33 +137,68 @@ func newRouter() *httprouter.Router {
 	return r
 }
 
-func New(ao *AppOptions) *App {
-	server := &http.Server{}
-	if ao != nil {
-		server.Addr = ao.Addr
-		server.TLSConfig = ao.TLSConfig
-		server.ReadTimeout = ao.ReadTimeout
-		server.ReadHeaderTimeout = ao.ReadHeaderTimeout
-		server.WriteTimeout = ao.WriteTimeout
-		server.IdleTimeout = ao.IdleTimeout
-		server.MaxHeaderBytes = ao.MaxHeaderBytes
-		if len(ao.TLSNextProto) > 0 {
-			v := map[string]func(*http.Server, *tls.Conn, http.Handler){}
-			for k, f := range ao.TLSNextProto {
-				v[k] = func(s *http.Server, c *tls.Conn, h http.Handler) {
-					a := New(nil)
-					a.server = s
-					a.router = newRouter()
-					f(a, c)
-				}
-			}
-		}
-		server.Handler = newRouter()
+func New(ao AppOptions) (*App, error) {
+	server := ao.server()
+	app := &App{}
+	app.router = newRouter()
+	app.Handler = app.router
+	app.fromServer(server)
+	app.updateInfo(ao.Info)
+
+	if app.info.Title == "" {
+		return nil, wrapErr(fmt.Errorf("AppOptions.Info.Title cannot be empty"))
 	}
-	app := App{
-		server: server,
+
+	if app.info.Version == "" {
+		return nil, wrapErr(fmt.Errorf("AppOptions.Info.Version cannot be empty"))
 	}
-	return &app
+	app.paths = openapi3.Paths{}
+	return app, nil
+}
+
+func (a *App) updateInfo(i Info) {
+	if a.info == nil {
+		a.info = &Info{}
+	}
+
+	if i.Extensions != nil {
+		a.info.Extensions = i.Extensions
+	}
+
+	if i.Title != "" {
+		a.info.Title = i.Title
+	}
+
+	if i.Description != "" {
+		a.info.Description = i.Description
+	}
+
+	if i.TermsOfService != "" {
+		a.info.TermsOfService = i.TermsOfService
+	}
+
+	if i.Contact != nil {
+		a.info.Contact = i.Contact
+	}
+
+	if i.License != nil {
+		a.info.License = i.License
+	}
+
+	if i.Version != "" {
+		a.info.Version = i.Version
+	}
+}
+
+func (a *App) fromServer(server *http.Server) {
+	a.Addr = server.Addr
+	a.TLSConfig = server.TLSConfig
+	a.ReadTimeout = server.ReadTimeout
+	a.ReadHeaderTimeout = server.ReadHeaderTimeout
+	a.WriteTimeout = server.WriteTimeout
+	a.IdleTimeout = server.IdleTimeout
+	a.MaxHeaderBytes = server.MaxHeaderBytes
+	a.TLSNextProto = server.TLSNextProto
 }
 
 func (a *App) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -128,17 +210,33 @@ func errorHandler(rc *RequestCtx, err error) error {
 	if e, ok := err.(*Error); ok {
 		code = e.Code
 	}
-	rc.rw.WriteHeader(code)
-	if _, err := rc.rw.Write([]byte(err.Error())); err != nil {
+	rc.ResponseWriter.WriteHeader(code)
+	if _, err := rc.ResponseWriter.Write([]byte(err.Error())); err != nil {
 		return err
 	}
 	return nil
 }
 
-func (a *App) registerEndpoint(
-	route string, pl Payload, h Handler,
-	rw http.ResponseWriter, r *http.Request, p httprouter.Params,
-) {
+// var responseBodyPool = map[string]sync.Pool{}
+
+func (app *App) registerEndpoint(
+	method, route string, h Handler,
+	f func(string, httprouter.Handle),
+	ps ...Payload,
+) error {
+	var payloadInputs []Payload
+	if len(ps) > 0 {
+		payloadInputs = append(payloadInputs, ps[0])
+	}
+
+	if len(ps) > 1 {
+		payloadInputs = append(payloadInputs, ps[1])
+	}
+
+	if len(ps) > 2 {
+		payloadInputs = append(payloadInputs, ps[2])
+	}
+
 	ep, ok := epPool.Get().(*endpoint)
 	if !ok {
 		panic("epPool gave something thats not endpoint... aaaaaaa!!")
@@ -147,55 +245,117 @@ func (a *App) registerEndpoint(
 		ep.reset()
 		epPool.Put(ep)
 	}()
-	ep.update(route, pl, h, rw, r, p)
-	ep.handle()
+	ep.update(method, route, h, payloadInputs...)
+	ep.handle(f)
+	pi, err := ep.pathItem()
+	if err != nil {
+		return wrapErr(err)
+	}
+	app.paths[route] = pi
+	return nil
 }
 
-func (a *App) Get(r string, pl Payload, h Handler) {
-	registerRoute(a, http.MethodGet, r, pl, h)
+type HandleFuncType func(string, Payload, Handler) error
+
+// HTTP Method specific handler registrations.
+// All route specific restrictions of httprouter apply
+// The ps (Payload) variadic input at the end can accept upto 3 objects
+// The first one, when exists, determines the request body type
+// When provided the RequestData struct received in the handler will have
+// request.Body unmarshaled to the Body field.
+// request.Body will hence be empty
+// The second one, when exists, determines the query parameter type
+// When provided the RequestData struct received in the handler will have
+// the url query unmarshaled to the QueryParams field
+// The third one, when exists, determines the response body type
+// It is recommended to provide the above types to generate a valid openapi schema
+func (app *App) Get(r string, h Handler, ps ...Payload) error {
+	if err := app.registerEndpoint(
+		http.MethodGet, r, h, app.router.GET,
+		ps...,
+	); err != nil {
+		return wrapErr(err)
+	}
+	return nil
 }
 
-func (a *App) Post(r string, pl Payload, h Handler) {
-	registerRoute(a, http.MethodPost, r, pl, h)
+func (app *App) Post(r string, pl Payload, h Handler, ps ...Payload) error {
+	if err := app.registerEndpoint(
+		http.MethodPost, r, h, app.router.POST,
+		ps...,
+	); err != nil {
+		return wrapErr(err)
+	}
+	return nil
 }
 
-func (a *App) Delete(r string, pl Payload, h Handler) {
-	registerRoute(a, http.MethodDelete, r, pl, h)
+func (app *App) Delete(r string, pl Payload, h Handler, ps ...Payload) error {
+	if err := app.registerEndpoint(
+		http.MethodDelete, r, h, app.router.DELETE,
+		ps...,
+	); err != nil {
+		return wrapErr(err)
+	}
+	return nil
 }
 
-func (a *App) Put(r string, pl Payload, h Handler) {
-	registerRoute(a, http.MethodPut, r, pl, h)
+func (app *App) Put(r string, h Handler, ps ...Payload) error {
+	if err := app.registerEndpoint(
+		http.MethodPut, r, h, app.router.PUT,
+		ps...,
+	); err != nil {
+		return wrapErr(err)
+	}
+	return nil
 }
 
-func (a *App) Patch(r string, pl Payload, h Handler) {
-	registerRoute(a, http.MethodPatch, r, pl, h)
+func (app *App) Patch(r string, h Handler, ps ...Payload) error {
+	if err := app.registerEndpoint(
+		http.MethodPatch, r, h, app.router.PATCH,
+		ps...,
+	); err != nil {
+		return wrapErr(err)
+	}
+	return nil
 }
 
-func (a *App) Options(r string, pl Payload, h Handler) {
-	registerRoute(a, http.MethodOptions, r, pl, h)
+func (app *App) Options(r string, h Handler, ps ...Payload) error {
+	if err := app.registerEndpoint(
+		http.MethodOptions, r, h, app.router.OPTIONS,
+		ps...,
+	); err != nil {
+		return wrapErr(err)
+	}
+	return nil
 }
 
-func (a *App) Head(r string, pl Payload, h Handler) {
-	registerRoute(a, http.MethodHead, r, pl, h)
+func (app *App) Head(r string, h Handler, ps ...Payload) error {
+	if err := app.registerEndpoint(
+		http.MethodHead, r, h, app.router.HEAD,
+		ps...,
+	); err != nil {
+		return wrapErr(err)
+	}
+	return nil
 }
 
-func (a *App) Listen() error {
-	if a == nil || a.router == nil {
+func (app *App) Listen() error {
+	if app == nil || app.router == nil {
 		return wrapErr(fmt.Errorf("app not initialized"))
 	}
 
-	if a.server.TLSConfig != nil {
-		conn, err := net.Listen("tcp", a.server.Addr)
+	if app.TLSConfig != nil {
+		conn, err := net.Listen("tcp", app.Addr)
 		if err != nil {
 			return wrapErr(err)
 		}
 
-		tlsListener := tls.NewListener(conn, a.server.TLSConfig)
-		if err := a.server.Serve(tlsListener); err != nil {
+		tlsListener := tls.NewListener(conn, app.TLSConfig)
+		if err := app.Serve(tlsListener); err != nil {
 			return wrapErr(err)
 		}
 	} else {
-		if err := a.server.ListenAndServe(); err != nil {
+		if err := app.ListenAndServe(); err != nil {
 			return wrapErr(err)
 		}
 	}

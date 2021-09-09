@@ -12,6 +12,10 @@ func NewString(s string) *String {
 	return &v
 }
 
+func (s String) String() string {
+	return string(s)
+}
+
 func (s String) Marshal() ([]byte, error) {
 	return []byte(s), nil
 }
@@ -21,11 +25,19 @@ func (s *String) Unmarshal(src []byte) error {
 	return nil
 }
 
+func (String) ContentType() ContentType {
+	return ContentTypeTEXT
+}
+
 type Int8 int8
 
 func NewInt8(i int8) *Int8 {
 	v := Int8(i)
 	return &v
+}
+
+func (i Int8) Int8() int8 {
+	return int8(i)
 }
 
 func (i Int8) Marshal() ([]byte, error) {
@@ -41,11 +53,19 @@ func (i *Int8) Unmarshal(src []byte) error {
 	return nil
 }
 
+func (Int8) ContentType() ContentType {
+	return ContentTypeTEXT
+}
+
 type Int int
 
 func NewInt(i int) *Int {
 	v := Int(i)
 	return &v
+}
+
+func (i Int) Int() int {
+	return int(i)
 }
 
 func (i Int) Marshal() ([]byte, error) {
@@ -60,12 +80,19 @@ func (i *Int) Unmarshal(src []byte) error {
 	*i = Int(v)
 	return nil
 }
+func (Int) ContentType() ContentType {
+	return ContentTypeTEXT
+}
 
 type Int64 int64
 
 func NewInt64(i int64) *Int64 {
 	v := Int64(i)
 	return &v
+}
+
+func (i Int64) Int64() int64 {
+	return int64(i)
 }
 
 func (i Int64) Marshal() ([]byte, error) {
@@ -81,11 +108,19 @@ func (i *Int64) Unmarshal(src []byte) error {
 	return nil
 }
 
+func (Int64) ContentType() ContentType {
+	return ContentTypeTEXT
+}
+
 type Uint8 uint8
 
 func NewUint8(u uint8) *Uint8 {
 	v := Uint8(u)
 	return &v
+}
+
+func (u Uint8) Uint8() uint8 {
+	return uint8(u)
 }
 
 func (i Uint8) Marshal() ([]byte, error) {
@@ -101,11 +136,19 @@ func (i *Uint8) Unmarshal(src []byte) error {
 	return nil
 }
 
+func (Uint8) ContentType() ContentType {
+	return ContentTypeTEXT
+}
+
 type Uint uint
 
 func NewUint(u uint) *Uint {
 	v := Uint(u)
 	return &v
+}
+
+func (u Uint) Uint() uint {
+	return uint(u)
 }
 
 func (i Uint) Marshal() ([]byte, error) {
@@ -121,11 +164,19 @@ func (i *Uint) Unmarshal(src []byte) error {
 	return nil
 }
 
+func (Uint) ContentType() ContentType {
+	return ContentTypeTEXT
+}
+
 type Uint64 uint64
 
 func NewUint64(u uint64) *Uint64 {
 	v := Uint64(u)
 	return &v
+}
+
+func (u Uint64) Uint64() uint64 {
+	return uint64(u)
 }
 
 func (i Uint64) Marshal() ([]byte, error) {
@@ -141,6 +192,10 @@ func (i *Uint64) Unmarshal(src []byte) error {
 	return nil
 }
 
+func (Uint64) ContentType() ContentType {
+	return ContentTypeTEXT
+}
+
 type Bool bool
 
 func NewBool(b bool) *Bool {
@@ -153,6 +208,10 @@ func (b Bool) string() string {
 		return "true"
 	}
 	return "false"
+}
+
+func (b Bool) Bool() bool {
+	return bool(b)
 }
 
 func (b *Bool) fromString(s string) error {
@@ -176,4 +235,23 @@ func (b Bool) Marshal() ([]byte, error) {
 
 func (b *Bool) Unmarshal(src []byte) error {
 	return b.fromString(string(src))
+}
+
+func (Bool) ContentType() ContentType {
+	return ContentTypeTEXT
+}
+
+type HTML []byte
+
+func (h *HTML) Unmarshal(src []byte) error {
+	*h = src
+	return nil
+}
+
+func (h HTML) Marshal() ([]byte, error) {
+	return h, nil
+}
+
+func (HTML) ContentType() ContentType {
+	return "text/html; charset=utf-8"
 }

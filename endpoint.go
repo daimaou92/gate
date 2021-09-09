@@ -1,25 +1,29 @@
 package gate
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"reflect"
+	"strings"
 	"sync"
 
+	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/julienschmidt/httprouter"
 )
 
+var requestBodyPool = map[string]sync.Pool{}
+var queryPool = map[string]sync.Pool{}
+
 type endpoint struct {
-	route   string
-	handler Handler
-	Payload Payload
-	rw      http.ResponseWriter
-	r       *http.Request
-	params  httprouter.Params
-	typ     reflect.Type
-	val     reflect.Value
+	method          string
+	route           string
+	handler         Handler
+	requestPayload  Payload
+	queryPayload    Payload
+	responsePayload Payload
 }
 
 var epPool sync.Pool
@@ -30,110 +34,264 @@ func init() {
 	}
 }
 
+func (ep endpoint) routeDetails() (string, []string) {
+	// qps := queryParams(ep.Payload)
+	params := pathParams(ep.route)
+	if len(params) == 0 {
+		return ep.route, nil
+	}
+	r := ep.route
+	for i, param := range params {
+		fr := fmt.Sprintf("{%s}", strings.Trim(strings.Replace(param, ":", "", 1), "/"))
+		r = strings.Replace(r, param, fr, 1)
+		pname := strings.Trim(strings.Replace(param, ":", "", 1), "/")
+		params[i] = pname
+	}
+	return r, params
+}
+
+func (ep endpoint) requestSchema() (openapi3.Schema, error) {
+	s, err := schemaFromType(reflect.TypeOf(ep.handler).In(1))
+	if err != nil {
+		return *openapi3.NewSchema(), wrapErr(err)
+	}
+	return s, nil
+}
+
+func (ep endpoint) responseSchema() (openapi3.Schema, error) {
+	t := reflect.TypeOf(ep.handler)
+	if t.Kind() != reflect.Func {
+		return openapi3.Schema{}, wrapErr(fmt.Errorf("type if not a func"))
+	}
+	s, err := schemaFromType(t.Out(0))
+	if err != nil {
+		return openapi3.Schema{}, wrapErr(err)
+	}
+	return s, nil
+}
+
+// func (ep endpoint) generatePathItem() {
+// 	op := openapi3.NewOperation()
+// 	op.OperationID = ep.route
+// 	formattedRoute, params, queryParams := ep.routeDetails()
+
+// }
+
 func (ep *endpoint) update(
-	route string, pl Payload, h Handler,
-	rw http.ResponseWriter, r *http.Request, p httprouter.Params,
+	method, route string, h Handler,
+	ps ...Payload,
 ) {
+	ep.method = method
 	ep.route = route
 	ep.handler = h
-	ep.rw = rw
-	ep.r = r
-	ep.params = p
 
-	if pl == nil {
-		return
+	if len(ps) > 0 {
+		pl := ps[0]
+		if _, ok := requestBodyPool[route]; !ok {
+			requestBodyPool[route] = sync.Pool{
+				New: func() interface{} {
+					inpt := reflect.TypeOf(pl)
+					switch inpt.Kind() {
+					case reflect.Array, reflect.Chan,
+						reflect.Map, reflect.Ptr, reflect.Slice:
+						inpt = inpt.Elem()
+					}
+					val := reflect.ValueOf(pl)
+					v := reflect.New(inpt).Elem()
+					v.Set(val.Elem())
+					return v.Addr()
+				},
+			}
+		}
+		ep.requestPayload = pl
 	}
 
-	ep.typ = reflect.TypeOf(pl).Elem()
-	ep.val = reflect.ValueOf(pl)
+	if len(ps) > 1 {
+		pl := ps[1]
+		if _, ok := queryPool[route]; !ok {
+			queryPool[route] = sync.Pool{
+				New: func() interface{} {
+					inpt := reflect.TypeOf(pl)
+					switch inpt.Kind() {
+					case reflect.Array, reflect.Chan,
+						reflect.Map, reflect.Ptr, reflect.Slice:
+						inpt = inpt.Elem()
+					}
+					val := reflect.ValueOf(pl)
+					v := reflect.New(inpt).Elem()
+					v.Set(val.Elem())
+					return v.Addr()
+				},
+			}
+		}
+
+		ep.queryPayload = pl
+	}
+
+	if len(ps) > 2 {
+		ep.responsePayload = ps[2]
+	}
+
+	// if pl == nil {
+	// 	return
+	// }
+
+	// ep.typ = reflect.TypeOf(pl).Elem()
+	// ep.val = reflect.ValueOf(pl)
 }
 
 func (ep *endpoint) reset() {
 	ep.handler = nil
-	ep.Payload = nil
-	ep.rw = nil
-	ep.r = nil
-	ep.params = nil
+	// ep.Payload = nil
 	ep.route = ""
-	ep.typ = nil
-	ep.val = reflect.Value{}
+	ep.method = ""
+	ep.requestPayload = nil
+	ep.queryPayload = nil
+	ep.responsePayload = nil
+	// ep.typ = nil
+	// ep.val = reflect.Value{}
 }
 
-func (ep *endpoint) handle() {
-	if ep.r.Method == http.MethodPost ||
-		ep.r.Method == http.MethodPut ||
-		ep.r.Method == http.MethodDelete ||
-		ep.r.Method == http.MethodPatch {
-		bs, err := io.ReadAll(ep.r.Body)
-		if err != nil {
-			if err != io.EOF {
-				log.Println(`[WARN] -> Payload is not empty. Error reading request body`, err.Error())
-			}
-		} else {
-			defer ep.r.Body.Close()
-			if len(bs) > 0 && ep.typ != nil {
-				pfv := reflect.ValueOf(ep).Elem().FieldByName("Payload")
-				if ep.val.Kind() == reflect.Ptr {
-					var v reflect.Value
-					if pool, ok := ppm[ep.route]; ok {
-						pv := pool.Get()
-						if pv == nil {
-							panic(fmt.Errorf("route: %s pool returned nil... aaaaaaa", ep.route))
-						}
-						defer pool.Put(pv)
-						if v, ok = pv.(reflect.Value); !ok {
-							panic(fmt.Errorf("route: %s pool returned value thats not reflect.Value... aaaaaaa", ep.route))
-						}
-					} else {
-						j := reflect.New(ep.typ).Elem()
-						j.Set(ep.val.Elem())
-						v = j.Addr()
-					}
-					pfv.Set(v)
-				} else {
-					pfv.Set(ep.val)
-				}
+func (ep *endpoint) handle(f func(string, httprouter.Handle)) {
+	f(ep.route, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 
-				// log.Println("Payload: ", ep.Payload)
-				if err := ep.Payload.Unmarshal(bs); err != nil {
-					log.Println("[ERR] -> Unmarshal to Payload failed", err.Error())
+		rd := RequestData{
+			Params: params,
+		}
+
+		badrequest := func(msg string) {
+			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+			w.WriteHeader(StatusBadRequest)
+			w.Write([]byte(msg))
+		}
+
+		// Request Payload
+		if ep.requestPayload != nil {
+			pool, ok := requestBodyPool[ep.route]
+			if !ok {
+				panic(wrapErr(fmt.Errorf("route has defined request payload but no pool")))
+			}
+
+			pv := pool.Get()
+			if pv == nil {
+				panic(wrapErr(fmt.Errorf("requestPayload Pool returned nil....aaaaaaaa")))
+			}
+			defer pool.Put(pv)
+
+			v, ok := pv.(reflect.Value)
+			if !ok {
+				panic(wrapErr(fmt.Errorf("requestBodyPool returned value of type not equal to reflect.Value")))
+			}
+			reflect.ValueOf(&rd).Elem().FieldByName("Body").Set(v)
+
+			bs, err := io.ReadAll(r.Body)
+			if err != nil {
+				// log.Println(wrapErr(err, "readall failed"))
+				if err != io.EOF {
+					log.Println(wrapErr(err))
+					badrequest("connection error")
 					return
 				}
 			}
+
+			if len(bs) > 0 {
+				if err := rd.Body.Unmarshal(bs); err != nil {
+					log.Println(wrapErr(err, "request unmarshal failed"))
+					badrequest("invalid payload")
+					return
+				}
+			} else {
+				badrequest("empty payload")
+				return
+			}
 		}
-	}
 
-	rc, ok := rcPool.Get().(*RequestCtx)
-	if !ok {
-		panic(`rcpool returned something thats not a RequestCtx... aaaaaaaaa!!`)
-	}
-	defer func() {
-		rc.Reset()
-		rcPool.Put(rc)
-	}()
+		// Query Params
+		if ep.queryPayload != nil {
+			pool, ok := queryPool[ep.route]
+			if !ok {
+				panic(wrapErr(fmt.Errorf("route has defined request payload but no pool")))
+			}
+			pv := pool.Get()
+			if pv == nil {
+				panic(wrapErr(fmt.Errorf("query pool returned empty....aaaaaaa")))
+			}
+			defer pool.Put(pv)
+			v, ok := pv.(reflect.Value)
+			if !ok {
+				panic(wrapErr(fmt.Errorf("queryPool returned value of type not equal to reflect.Value")))
+			}
+			reflect.ValueOf(&rd).Elem().FieldByName("QueryParams").Set(v)
 
-	rc.update(ep.rw, ep.r, ep.params)
+			bs, err := json.Marshal(r.URL.Query())
+			if err != nil && err != io.EOF {
+				// This block will never run so not tested
+				log.Println(wrapErr(err, "json marshal url query failed"))
+				badrequest("invalid or missing query params")
+				return
+			}
 
-	resp, err := ep.handler(rc, ep.Payload)
-	if err != nil {
-		if err := errorHandler(rc, err); err != nil {
-			log.Println("[ERR] -> responding err")
-			return
+			if len(bs) > 0 {
+				if err := rd.QueryParams.Unmarshal(bs); err != nil {
+					/*
+					  This part is not very helpful because it will be valid for any Payload
+					  type that inherently has a string->[]string structure and will fail
+					  for every other case.
+					  Ideally the structure should be verified using reflection.
+					  This Unmarshal failing will always indicate the one case above
+					*/
+					log.Println(wrapErr(err, "query unmarshal failed"))
+					badrequest("invalid or missing query params")
+					return
+				}
+				// Test if empty map
+				testm := map[string][]string{}
+				json.Unmarshal(bs, &testm)
+				if len(testm) == 0 {
+					badrequest("empty query params")
+					return
+				}
+			} else {
+				badrequest("empty query params")
+				return
+			}
 		}
-	}
-	if resp != nil {
-		bs, err := resp.Marshal()
+
+		rc, ok := rcPool.Get().(*RequestCtx)
+		if !ok {
+			panic(`rcpool returned something thats not a RequestCtx... aaaaaaaaa!!`)
+		}
+		defer func() {
+			rc.Reset()
+			rcPool.Put(rc)
+		}()
+		rc.update(w, r)
+
+		resp, err := ep.handler(rc, rd)
 		if err != nil {
-			log.Println("[ERR] -> [response] -> Payload.Marshal -> ", err.Error())
-			if err := errorHandler(rc, ErrInternalServerError); err != nil {
-				log.Println("[ERR] -> err in responding with auto generated Internal Server Error", err.Error())
+			if err := errorHandler(rc, err); err != nil {
+				log.Println(wrapErr(err))
 			}
 			return
 		}
-		ep.rw.WriteHeader(StatusOK)
-		ep.rw.Write(bs)
-		return
-	}
 
-	ep.rw.WriteHeader(StatusOK)
+		if resp != nil {
+			resBody, err := resp.Marshal()
+			if err != nil {
+				log.Println(wrapErr(err))
+				if err := errorHandler(rc, NewError(StatusInternalServerError)); err != nil {
+					log.Println(wrapErr(err))
+				}
+				return
+			}
+
+			w.WriteHeader(StatusOK)
+			w.Write(resBody)
+		}
+	})
+}
+
+func (ep *endpoint) pathItem() (*openapi3.PathItem, error) {
+	// TODO
+	return &openapi3.PathItem{}, nil
 }
