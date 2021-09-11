@@ -15,15 +15,15 @@ import (
 
 type App struct {
 	http.Server
-	info   *Info
 	router *httprouter.Router
 	paths  openapi3.Paths
+	Info   *openapi3.Info
 }
 
 type AppPanicHandler func(http.ResponseWriter, *http.Request, interface{})
 
 type AppOptions struct {
-	Info              Info
+	Info              openapi3.Info
 	Addr              string
 	TLSConfig         *tls.Config
 	ReadTimeout       time.Duration
@@ -73,8 +73,8 @@ func (ao AppOptions) server() *http.Server {
 		v := map[string]func(*http.Server, *tls.Conn, http.Handler){}
 		for k, f := range ao.TLSNextProto {
 			v[k] = func(s *http.Server, c *tls.Conn, h http.Handler) {
-				a := &App{}
-				a.fromServer(s)
+				a := new(App)
+				a.FromServer(s)
 				a.router = newRouter()
 				a.Handler = a.router
 				f(a, c)
@@ -142,55 +142,55 @@ func New(ao AppOptions) (*App, error) {
 	app := &App{}
 	app.router = newRouter()
 	app.Handler = app.router
-	app.fromServer(server)
-	app.updateInfo(ao.Info)
+	app.FromServer(server)
+	app.UpdateInfo(ao.Info)
 
-	if app.info.Title == "" {
+	if app.Info.Title == "" {
 		return nil, wrapErr(fmt.Errorf("AppOptions.Info.Title cannot be empty"))
 	}
 
-	if app.info.Version == "" {
+	if app.Info.Version == "" {
 		return nil, wrapErr(fmt.Errorf("AppOptions.Info.Version cannot be empty"))
 	}
 	app.paths = openapi3.Paths{}
 	return app, nil
 }
 
-func (a *App) updateInfo(i Info) {
-	if a.info == nil {
-		a.info = &Info{}
+func (a *App) UpdateInfo(i openapi3.Info) {
+	if a.Info == nil {
+		a.Info = new(openapi3.Info)
 	}
 
 	if i.Extensions != nil {
-		a.info.Extensions = i.Extensions
+		a.Info.Extensions = i.Extensions
 	}
 
 	if i.Title != "" {
-		a.info.Title = i.Title
+		a.Info.Title = i.Title
 	}
 
 	if i.Description != "" {
-		a.info.Description = i.Description
+		a.Info.Description = i.Description
 	}
 
 	if i.TermsOfService != "" {
-		a.info.TermsOfService = i.TermsOfService
+		a.Info.TermsOfService = i.TermsOfService
 	}
 
 	if i.Contact != nil {
-		a.info.Contact = i.Contact
+		a.Info.Contact = i.Contact
 	}
 
 	if i.License != nil {
-		a.info.License = i.License
+		a.Info.License = i.License
 	}
 
 	if i.Version != "" {
-		a.info.Version = i.Version
+		a.Info.Version = i.Version
 	}
 }
 
-func (a *App) fromServer(server *http.Server) {
+func (a *App) FromServer(server *http.Server) {
 	a.Addr = server.Addr
 	a.TLSConfig = server.TLSConfig
 	a.ReadTimeout = server.ReadTimeout
@@ -237,14 +237,7 @@ func (app *App) registerEndpoint(
 		payloadInputs = append(payloadInputs, ps[2])
 	}
 
-	ep, ok := epPool.Get().(*endpoint)
-	if !ok {
-		panic("epPool gave something thats not endpoint... aaaaaaa!!")
-	}
-	defer func() {
-		ep.reset()
-		epPool.Put(ep)
-	}()
+	ep := new(endpoint)
 	ep.update(method, route, h, payloadInputs...)
 	ep.handle(f)
 	pi, err := ep.pathItem()
@@ -255,7 +248,7 @@ func (app *App) registerEndpoint(
 	return nil
 }
 
-type HandleFuncType func(string, Payload, Handler) error
+type HandleFuncType func(string, Handler, ...Payload) error
 
 // HTTP Method specific handler registrations.
 // All route specific restrictions of httprouter apply
@@ -279,7 +272,7 @@ func (app *App) Get(r string, h Handler, ps ...Payload) error {
 	return nil
 }
 
-func (app *App) Post(r string, pl Payload, h Handler, ps ...Payload) error {
+func (app *App) Post(r string, h Handler, ps ...Payload) error {
 	if err := app.registerEndpoint(
 		http.MethodPost, r, h, app.router.POST,
 		ps...,
@@ -289,7 +282,7 @@ func (app *App) Post(r string, pl Payload, h Handler, ps ...Payload) error {
 	return nil
 }
 
-func (app *App) Delete(r string, pl Payload, h Handler, ps ...Payload) error {
+func (app *App) Delete(r string, h Handler, ps ...Payload) error {
 	if err := app.registerEndpoint(
 		http.MethodDelete, r, h, app.router.DELETE,
 		ps...,

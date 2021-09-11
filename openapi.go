@@ -9,7 +9,7 @@ import (
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
-type Info openapi3.Info
+// type Info openapi3.Info
 
 func pathParams(r string) []string {
 	reg := regexp.MustCompile(`/:[\p{L}_][\p{L}_\p{Nd}]*`)

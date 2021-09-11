@@ -41,7 +41,7 @@ type RequestData struct {
 	QueryParams Payload
 }
 
-type Handler func(*RequestCtx, RequestData) (Payload, error)
+type Handler func(*RequestCtx, *RequestData) (Payload, error)
 
 // type StreamHandler func(*RequestCtx, io.WriteCloser) error
 

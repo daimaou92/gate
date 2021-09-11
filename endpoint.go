@@ -17,6 +17,12 @@ import (
 var requestBodyPool = map[string]sync.Pool{}
 var queryPool = map[string]sync.Pool{}
 
+var requestDataPool = sync.Pool{
+	New: func() interface{} {
+		return new(RequestData)
+	},
+}
+
 type endpoint struct {
 	method          string
 	route           string
@@ -26,13 +32,13 @@ type endpoint struct {
 	responsePayload Payload
 }
 
-var epPool sync.Pool
+// var epPool sync.Pool
 
-func init() {
-	epPool.New = func() interface{} {
-		return new(endpoint)
-	}
-}
+// func init() {
+// 	epPool.New = func() interface{} {
+// 		return new(endpoint)
+// 	}
+// }
 
 func (ep endpoint) routeDetails() (string, []string) {
 	// qps := queryParams(ep.Payload)
@@ -131,13 +137,6 @@ func (ep *endpoint) update(
 	if len(ps) > 2 {
 		ep.responsePayload = ps[2]
 	}
-
-	// if pl == nil {
-	// 	return
-	// }
-
-	// ep.typ = reflect.TypeOf(pl).Elem()
-	// ep.val = reflect.ValueOf(pl)
 }
 
 func (ep *endpoint) reset() {
@@ -155,9 +154,12 @@ func (ep *endpoint) reset() {
 func (ep *endpoint) handle(f func(string, httprouter.Handle)) {
 	f(ep.route, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 
-		rd := RequestData{
-			Params: params,
+		rd, ok := requestDataPool.Get().(*RequestData)
+		if !ok {
+			panic(wrapErr(fmt.Errorf("requestDataPool returned not *RequestData.... aaaaaaa")))
 		}
+		defer requestDataPool.Put(rd)
+		rd.Params = params
 
 		badrequest := func(msg string) {
 			w.Header().Set("Content-Type", "text/plain; charset=utf-8")
@@ -182,7 +184,7 @@ func (ep *endpoint) handle(f func(string, httprouter.Handle)) {
 			if !ok {
 				panic(wrapErr(fmt.Errorf("requestBodyPool returned value of type not equal to reflect.Value")))
 			}
-			reflect.ValueOf(&rd).Elem().FieldByName("Body").Set(v)
+			reflect.ValueOf(rd).Elem().FieldByName("Body").Set(v)
 
 			bs, err := io.ReadAll(r.Body)
 			if err != nil {
@@ -221,7 +223,7 @@ func (ep *endpoint) handle(f func(string, httprouter.Handle)) {
 			if !ok {
 				panic(wrapErr(fmt.Errorf("queryPool returned value of type not equal to reflect.Value")))
 			}
-			reflect.ValueOf(&rd).Elem().FieldByName("QueryParams").Set(v)
+			reflect.ValueOf(rd).Elem().FieldByName("QueryParams").Set(v)
 
 			bs, err := json.Marshal(r.URL.Query())
 			if err != nil && err != io.EOF {

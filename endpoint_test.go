@@ -81,7 +81,7 @@ func TestEndpointHandle(t *testing.T) {
 	tsts := []tt{
 		{
 			name:               "valid",
-			route:              "/:name",
+			route:              "/:namevalid",
 			url:                fmt.Sprintf("http://localhost:%d/paul?key=value", port),
 			method:             http.MethodPost,
 			requestPayloadType: tstReqBody,
@@ -90,7 +90,7 @@ func TestEndpointHandle(t *testing.T) {
 				Value: "b",
 			},
 			queryPayloadType: tstQueryBody,
-			handler: func(rc *RequestCtx, rd RequestData) (Payload, error) {
+			handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
 				return &testPld{
 					Key:   "a",
 					Value: "b",
@@ -104,13 +104,13 @@ func TestEndpointHandle(t *testing.T) {
 			outStatus: StatusOK,
 		}, {
 			name:               "Request Body Unmarshal Error",
-			route:              "/:name",
+			route:              "/:namerbue",
 			url:                fmt.Sprintf("http://localhost:%d/paul?key=value", port),
 			method:             http.MethodPost,
 			requestPayloadType: tstReqBody,
 			requestPayload:     NewString("hi there"),
 			queryPayloadType:   tstQueryBody,
-			handler: func(rc *RequestCtx, rd RequestData) (Payload, error) {
+			handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
 				return &testPld{
 					Key:   "a",
 					Value: "b",
@@ -121,12 +121,12 @@ func TestEndpointHandle(t *testing.T) {
 			outStatus: StatusBadRequest,
 		}, {
 			name:               "Request Body Missing Error",
-			route:              "/:name",
+			route:              "/:namerbme",
 			url:                fmt.Sprintf("http://localhost:%d/paul?key=value", port),
 			method:             http.MethodPost,
 			requestPayloadType: tstReqBody,
 			queryPayloadType:   tstQueryBody,
-			handler: func(rc *RequestCtx, rd RequestData) (Payload, error) {
+			handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
 				return &testPld{
 					Key:   "a",
 					Value: "b",
@@ -137,7 +137,7 @@ func TestEndpointHandle(t *testing.T) {
 			outStatus: StatusBadRequest,
 		}, {
 			name:               "Request Query Unmarshal Error",
-			route:              "/:id",
+			route:              "/:idrque",
 			url:                fmt.Sprintf("http://localhost:%d/paul?key=value", port),
 			method:             http.MethodPost,
 			requestPayloadType: tstReqBody,
@@ -146,7 +146,7 @@ func TestEndpointHandle(t *testing.T) {
 				Value: "b",
 			},
 			queryPayloadType: NewInt(0),
-			handler: func(rc *RequestCtx, rd RequestData) (Payload, error) {
+			handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
 				log.Println(rd.QueryParams)
 				return &testPld{
 					Key:   "a",
@@ -158,7 +158,7 @@ func TestEndpointHandle(t *testing.T) {
 			outStatus: StatusBadRequest,
 		}, {
 			name:               "Request Query Empty Error",
-			route:              "/:identifier",
+			route:              "/:identifierrqee",
 			url:                fmt.Sprintf("http://localhost:%d/paul", port),
 			method:             http.MethodPost,
 			requestPayloadType: tstReqBody,
@@ -167,7 +167,7 @@ func TestEndpointHandle(t *testing.T) {
 				Value: "b",
 			},
 			queryPayloadType: tstQueryBody,
-			handler: func(rc *RequestCtx, rd RequestData) (Payload, error) {
+			handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
 				log.Println(rd.QueryParams)
 				return &testPld{
 					Key:   "a",
@@ -215,25 +215,30 @@ func TestEndpointHandle(t *testing.T) {
 				req, err = http.NewRequest(tst.method, tst.url, nil)
 			}
 			if err != nil {
+				server.Shutdown(context.TODO())
 				t.Fatal(err)
 			}
 
 			res, err := http.DefaultClient.Do(req)
 			if err != nil {
+				server.Shutdown(context.TODO())
 				t.Fatal(err)
 			}
 			if res.StatusCode != tst.outStatus {
+				server.Shutdown(context.TODO())
 				t.Fatalf("received code: %d. Wanted: %d", res.StatusCode, tst.outStatus)
 			}
 
 			if tst.output != nil {
 				bs, err := io.ReadAll(res.Body)
 				if err != nil {
+					server.Shutdown(context.TODO())
 					t.Fatal(err)
 				}
 				defer res.Body.Close()
 				tbs, _ := tst.output.Marshal()
 				if !bytes.Equal(bs, tbs) {
+					server.Shutdown(context.TODO())
 					t.Fatalf("wanted: %s\nGot: %s\n", tbs, bs)
 				}
 			}
