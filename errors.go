@@ -4,7 +4,7 @@ import (
 	"strings"
 )
 
-type GateErr error
+// type GateErr error
 
 type Error struct {
 	Code    int
