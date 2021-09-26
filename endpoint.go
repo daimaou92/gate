@@ -158,7 +158,11 @@ func (ep *endpoint) handle(f func(string, httprouter.Handle)) {
 		if !ok {
 			panic(wrapErr(fmt.Errorf("requestDataPool returned not *RequestData.... aaaaaaa")))
 		}
-		defer requestDataPool.Put(rd)
+		defer func() {
+			rd.Custom = nil
+			requestDataPool.Put(rd)
+		}()
+		rd.Custom = map[string]interface{}{}
 		rd.Params = params
 
 		badrequest := func(msg string) {
