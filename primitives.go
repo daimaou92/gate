@@ -26,7 +26,7 @@ func (s *String) Unmarshal(src []byte) error {
 }
 
 func (String) ContentType() ContentType {
-	return ContentTypeTEXT
+	return ContentTypeJSON
 }
 
 type Int8 int8
@@ -54,7 +54,7 @@ func (i *Int8) Unmarshal(src []byte) error {
 }
 
 func (Int8) ContentType() ContentType {
-	return ContentTypeTEXT
+	return ContentTypeJSON
 }
 
 type Int int
@@ -81,7 +81,7 @@ func (i *Int) Unmarshal(src []byte) error {
 	return nil
 }
 func (Int) ContentType() ContentType {
-	return ContentTypeTEXT
+	return ContentTypeJSON
 }
 
 type Int64 int64
@@ -109,7 +109,7 @@ func (i *Int64) Unmarshal(src []byte) error {
 }
 
 func (Int64) ContentType() ContentType {
-	return ContentTypeTEXT
+	return ContentTypeJSON
 }
 
 type Uint8 uint8
@@ -137,7 +137,7 @@ func (i *Uint8) Unmarshal(src []byte) error {
 }
 
 func (Uint8) ContentType() ContentType {
-	return ContentTypeTEXT
+	return ContentTypeJSON
 }
 
 type Uint uint
@@ -165,7 +165,7 @@ func (i *Uint) Unmarshal(src []byte) error {
 }
 
 func (Uint) ContentType() ContentType {
-	return ContentTypeTEXT
+	return ContentTypeJSON
 }
 
 type Uint64 uint64
@@ -193,7 +193,7 @@ func (i *Uint64) Unmarshal(src []byte) error {
 }
 
 func (Uint64) ContentType() ContentType {
-	return ContentTypeTEXT
+	return ContentTypeJSON
 }
 
 type Bool bool
@@ -238,7 +238,7 @@ func (b *Bool) Unmarshal(src []byte) error {
 }
 
 func (Bool) ContentType() ContentType {
-	return ContentTypeTEXT
+	return ContentTypeJSON
 }
 
 type HTML []byte
