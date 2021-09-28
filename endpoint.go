@@ -1,7 +1,6 @@
 package gate
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
@@ -9,6 +8,8 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+
+	json "github.com/goccy/go-json"
 
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/julienschmidt/httprouter"

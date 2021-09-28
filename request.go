@@ -1,10 +1,11 @@
 package gate
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/url"
 	"reflect"
+
+	json "github.com/goccy/go-json"
 )
 
 type QueryPayload url.Values

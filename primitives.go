@@ -1,8 +1,7 @@
 package gate
 
 import (
-	"encoding/json"
-	"fmt"
+	json "github.com/goccy/go-json"
 )
 
 type String string
@@ -49,7 +48,7 @@ func (i Int8) Int8() int8 {
 }
 
 func (i Int8) Marshal() ([]byte, error) {
-	bs, err := json.Marshal(i.Int8())
+	bs, err := json.MarshalNoEscape(i.Int8())
 	if err != nil {
 		return nil, wrapErr(err)
 	}
@@ -58,7 +57,7 @@ func (i Int8) Marshal() ([]byte, error) {
 
 func (i *Int8) Unmarshal(src []byte) error {
 	var v int8
-	if err := json.Unmarshal(src, &v); err != nil {
+	if err := json.UnmarshalNoEscape(src, &v); err != nil {
 		return wrapErr(err)
 	}
 	*i = Int8(v)
@@ -81,7 +80,7 @@ func (i Int) Int() int {
 }
 
 func (i Int) Marshal() ([]byte, error) {
-	bs, err := json.Marshal(i.Int())
+	bs, err := json.MarshalNoEscape(i.Int())
 	if err != nil {
 		return nil, wrapErr(err)
 	}
@@ -90,7 +89,7 @@ func (i Int) Marshal() ([]byte, error) {
 
 func (i *Int) Unmarshal(src []byte) error {
 	var v int
-	if err := json.Unmarshal(src, &i); err != nil {
+	if err := json.UnmarshalNoEscape(src, &i); err != nil {
 		return wrapErr(err)
 	}
 	*i = Int(v)
@@ -112,7 +111,7 @@ func (i Int64) Int64() int64 {
 }
 
 func (i Int64) Marshal() ([]byte, error) {
-	bs, err := json.Marshal(i.Int64())
+	bs, err := json.MarshalNoEscape(i.Int64())
 	if err != nil {
 		return nil, wrapErr(err)
 	}
@@ -121,7 +120,7 @@ func (i Int64) Marshal() ([]byte, error) {
 
 func (i *Int64) Unmarshal(src []byte) error {
 	var v int64
-	if err := json.Unmarshal(src, &v); err != nil {
+	if err := json.UnmarshalNoEscape(src, &v); err != nil {
 		return wrapErr(err)
 	}
 	*i = Int64(v)
@@ -144,7 +143,7 @@ func (u Uint8) Uint8() uint8 {
 }
 
 func (i Uint8) Marshal() ([]byte, error) {
-	bs, err := json.Marshal(i.Uint8())
+	bs, err := json.MarshalNoEscape(i.Uint8())
 	if err != nil {
 		return nil, wrapErr(err)
 	}
@@ -153,7 +152,7 @@ func (i Uint8) Marshal() ([]byte, error) {
 
 func (i *Uint8) Unmarshal(src []byte) error {
 	var v uint8
-	if err := json.Unmarshal(src, &v); err != nil {
+	if err := json.UnmarshalNoEscape(src, &v); err != nil {
 		return wrapErr(err)
 	}
 	*i = Uint8(v)
@@ -176,7 +175,7 @@ func (u Uint) Uint() uint {
 }
 
 func (i Uint) Marshal() ([]byte, error) {
-	bs, err := json.Marshal(i.Uint())
+	bs, err := json.MarshalNoEscape(i.Uint())
 	if err != nil {
 		return nil, wrapErr(err)
 	}
@@ -185,7 +184,7 @@ func (i Uint) Marshal() ([]byte, error) {
 
 func (i *Uint) Unmarshal(src []byte) error {
 	var v uint
-	if err := json.Unmarshal(src, &v); err != nil {
+	if err := json.UnmarshalNoEscape(src, &v); err != nil {
 		return wrapErr(err)
 	}
 	*i = Uint(v)
@@ -208,7 +207,7 @@ func (u Uint64) Uint64() uint64 {
 }
 
 func (i Uint64) Marshal() ([]byte, error) {
-	bs, err := json.Marshal(i.Uint64())
+	bs, err := json.MarshalNoEscape(i.Uint64())
 	if err != nil {
 		return nil, wrapErr(err)
 	}
@@ -217,7 +216,7 @@ func (i Uint64) Marshal() ([]byte, error) {
 
 func (i *Uint64) Unmarshal(src []byte) error {
 	var v uint64
-	if err := json.Unmarshal(src, &v); err != nil {
+	if err := json.UnmarshalNoEscape(src, &v); err != nil {
 		return wrapErr(err)
 	}
 	*i = Uint64(v)
@@ -235,34 +234,12 @@ func NewBool(b bool) *Bool {
 	return &v
 }
 
-func (b Bool) string() string {
-	if b {
-		return "true"
-	}
-	return "false"
-}
-
 func (b Bool) Bool() bool {
 	return bool(b)
 }
 
-func (b *Bool) fromString(s string) error {
-	if b == nil {
-		return fmt.Errorf("[ERR] no memory allocated")
-	}
-	switch s {
-	case "true":
-		*b = true
-		return nil
-	case "false":
-		*b = false
-		return nil
-	}
-	return fmt.Errorf("[ERR] invalid input: %s", s)
-}
-
 func (b Bool) Marshal() ([]byte, error) {
-	bs, err := json.Marshal(b)
+	bs, err := json.MarshalNoEscape(b)
 	if err != nil {
 		return nil, wrapErr(err)
 	}
@@ -271,7 +248,7 @@ func (b Bool) Marshal() ([]byte, error) {
 
 func (b *Bool) Unmarshal(src []byte) error {
 	var v bool
-	if err := json.Unmarshal(src, &v); err != nil {
+	if err := json.UnmarshalNoEscape(src, &v); err != nil {
 		return wrapErr(err)
 	}
 	*b = Bool(v)

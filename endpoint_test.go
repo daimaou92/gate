@@ -3,12 +3,13 @@ package gate
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"testing"
+
+	json "github.com/goccy/go-json"
 
 	"github.com/julienschmidt/httprouter"
 )

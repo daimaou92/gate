@@ -1,10 +1,11 @@
 package gate
 
 import (
-	"encoding/json"
 	"log"
 	"reflect"
 	"regexp"
+
+	json "github.com/goccy/go-json"
 
 	"github.com/getkin/kin-openapi/openapi3"
 )
