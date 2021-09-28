@@ -1,8 +1,8 @@
 package gate
 
 import (
+	"encoding/json"
 	"fmt"
-	"strconv"
 )
 
 type String string
@@ -17,11 +17,19 @@ func (s String) String() string {
 }
 
 func (s String) Marshal() ([]byte, error) {
-	return []byte(s), nil
+	bs, err := json.Marshal(s.String())
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+	return bs, nil
 }
 
 func (s *String) Unmarshal(src []byte) error {
-	*s = String(string(src))
+	var v string
+	if err := json.Unmarshal(src, &v); err != nil {
+		return wrapErr(err)
+	}
+	*s = String(v)
 	return nil
 }
 
@@ -41,13 +49,17 @@ func (i Int8) Int8() int8 {
 }
 
 func (i Int8) Marshal() ([]byte, error) {
-	return []byte(strconv.Itoa(int(i))), nil
+	bs, err := json.Marshal(i.Int8())
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+	return bs, nil
 }
 
 func (i *Int8) Unmarshal(src []byte) error {
-	v, err := strconv.Atoi(string(src))
-	if err != nil {
-		return err
+	var v int8
+	if err := json.Unmarshal(src, &v); err != nil {
+		return wrapErr(err)
 	}
 	*i = Int8(v)
 	return nil
@@ -69,13 +81,17 @@ func (i Int) Int() int {
 }
 
 func (i Int) Marshal() ([]byte, error) {
-	return []byte(strconv.Itoa(int(i))), nil
+	bs, err := json.Marshal(i.Int())
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+	return bs, nil
 }
 
 func (i *Int) Unmarshal(src []byte) error {
-	v, err := strconv.Atoi(string(src))
-	if err != nil {
-		return err
+	var v int
+	if err := json.Unmarshal(src, &i); err != nil {
+		return wrapErr(err)
 	}
 	*i = Int(v)
 	return nil
@@ -96,13 +112,17 @@ func (i Int64) Int64() int64 {
 }
 
 func (i Int64) Marshal() ([]byte, error) {
-	return []byte(strconv.Itoa(int(i))), nil
+	bs, err := json.Marshal(i.Int64())
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+	return bs, nil
 }
 
 func (i *Int64) Unmarshal(src []byte) error {
-	v, err := strconv.Atoi(string(src))
-	if err != nil {
-		return err
+	var v int64
+	if err := json.Unmarshal(src, &v); err != nil {
+		return wrapErr(err)
 	}
 	*i = Int64(v)
 	return nil
@@ -124,13 +144,17 @@ func (u Uint8) Uint8() uint8 {
 }
 
 func (i Uint8) Marshal() ([]byte, error) {
-	return []byte(strconv.Itoa(int(i))), nil
+	bs, err := json.Marshal(i.Uint8())
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+	return bs, nil
 }
 
 func (i *Uint8) Unmarshal(src []byte) error {
-	v, err := strconv.Atoi(string(src))
-	if err != nil {
-		return err
+	var v uint8
+	if err := json.Unmarshal(src, &v); err != nil {
+		return wrapErr(err)
 	}
 	*i = Uint8(v)
 	return nil
@@ -152,13 +176,17 @@ func (u Uint) Uint() uint {
 }
 
 func (i Uint) Marshal() ([]byte, error) {
-	return []byte(strconv.Itoa(int(i))), nil
+	bs, err := json.Marshal(i.Uint())
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+	return bs, nil
 }
 
 func (i *Uint) Unmarshal(src []byte) error {
-	v, err := strconv.Atoi(string(src))
-	if err != nil {
-		return err
+	var v uint
+	if err := json.Unmarshal(src, &v); err != nil {
+		return wrapErr(err)
 	}
 	*i = Uint(v)
 	return nil
@@ -180,13 +208,17 @@ func (u Uint64) Uint64() uint64 {
 }
 
 func (i Uint64) Marshal() ([]byte, error) {
-	return []byte(strconv.Itoa(int(i))), nil
+	bs, err := json.Marshal(i.Uint64())
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+	return bs, nil
 }
 
 func (i *Uint64) Unmarshal(src []byte) error {
-	v, err := strconv.Atoi(string(src))
-	if err != nil {
-		return err
+	var v uint64
+	if err := json.Unmarshal(src, &v); err != nil {
+		return wrapErr(err)
 	}
 	*i = Uint64(v)
 	return nil
@@ -230,26 +262,43 @@ func (b *Bool) fromString(s string) error {
 }
 
 func (b Bool) Marshal() ([]byte, error) {
-	return []byte(b.string()), nil
+	bs, err := json.Marshal(b)
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+	return bs, nil
 }
 
 func (b *Bool) Unmarshal(src []byte) error {
-	return b.fromString(string(src))
+	var v bool
+	if err := json.Unmarshal(src, &v); err != nil {
+		return wrapErr(err)
+	}
+	*b = Bool(v)
+	return nil
 }
 
 func (Bool) ContentType() ContentType {
 	return ContentTypeJSON
 }
 
-type HTML []byte
+type HTML string
 
 func (h *HTML) Unmarshal(src []byte) error {
-	*h = src
+	var v string
+	if err := json.Unmarshal(src, &v); err != nil {
+		return wrapErr(err)
+	}
+	*h = HTML(v)
 	return nil
 }
 
 func (h HTML) Marshal() ([]byte, error) {
-	return h, nil
+	bs, err := json.Marshal(string(h))
+	if err != nil {
+		return nil, wrapErr(err)
+	}
+	return bs, nil
 }
 
 func (HTML) ContentType() ContentType {
