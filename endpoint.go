@@ -300,8 +300,13 @@ func (ep *endpoint) handle(f func(string, httprouter.Handle)) {
 			return
 		}
 
+		if rc.ResponseWriter.written {
+			return
+		}
+
+		var resBody []byte
 		if resp != nil {
-			resBody, err := resp.Marshal()
+			resBody, err = resp.Marshal()
 			if err != nil {
 				log.Println(wrapErr(err))
 				if err := errorHandler(rc, NewError(StatusInternalServerError)); err != nil {
@@ -309,10 +314,9 @@ func (ep *endpoint) handle(f func(string, httprouter.Handle)) {
 				}
 				return
 			}
-
-			rc.ResponseWriter.WriteHeader(StatusOK)
-			rc.ResponseWriter.Write(resBody)
 		}
+		rc.ResponseWriter.WriteHeader(StatusOK)
+		rc.ResponseWriter.Write(resBody)
 	})
 }
 

@@ -58,15 +58,40 @@ func init() {
 	}
 }
 
+type ResponseWriter struct {
+	rw      http.ResponseWriter
+	written bool
+}
+
+func (rw *ResponseWriter) Write(bs []byte) (int, error) {
+	rw.written = true
+	i, err := rw.rw.Write(bs)
+	if err != nil {
+		return 0, wrapErr(err)
+	}
+	return i, nil
+}
+
+func (rw ResponseWriter) Header() http.Header {
+	return rw.rw.Header()
+}
+
+func (rw *ResponseWriter) WriteHeader(statusCode int) {
+	rw.rw.WriteHeader(statusCode)
+	rw.written = true
+}
+
 type RequestCtx struct {
 	Request        *http.Request
-	ResponseWriter http.ResponseWriter
+	ResponseWriter *ResponseWriter
 }
 
 // Must happen after payload unmarshal
 func (rc *RequestCtx) update(rw http.ResponseWriter, r *http.Request) {
 	rc.Request = r
-	rc.ResponseWriter = rw
+	rc.ResponseWriter = &ResponseWriter{
+		rw: rw,
+	}
 }
 
 func (rc *RequestCtx) Reset() {
