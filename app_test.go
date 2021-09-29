@@ -298,9 +298,7 @@ func TestListen(t *testing.T) {
 				method:             tst.method,
 			})
 
-			for _, m := range tst.middlewares {
-				app.Apply(m)
-			}
+			app.Apply(tst.middlewares...)
 
 			// Start server
 			go func() {

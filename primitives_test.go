@@ -17,7 +17,7 @@ func TestPMarshal(t *testing.T) {
 		{
 			name:   "string",
 			input:  NewString("hi there"),
-			output: []byte("hi there"),
+			output: []byte("\"hi there\""),
 		}, {
 			name:   "int8",
 			input:  NewInt8(98),
@@ -74,7 +74,7 @@ func TestPUnmarshal(t *testing.T) {
 		{
 			name:   "string",
 			obj:    NewString(""),
-			input:  []byte("hi there"),
+			input:  []byte("\"hi there\""),
 			output: nil,
 		}, {
 			name:   "int8",
@@ -84,7 +84,7 @@ func TestPUnmarshal(t *testing.T) {
 		}, {
 			name:   "int8err",
 			obj:    NewInt8(0),
-			input:  []byte("hello world"),
+			input:  []byte("\"hello world\""),
 			output: fmt.Errorf(""),
 		}, {
 			name:   "int",
@@ -94,7 +94,7 @@ func TestPUnmarshal(t *testing.T) {
 		}, {
 			name:   "interr",
 			obj:    NewInt(0),
-			input:  []byte("hello world"),
+			input:  []byte("\"hello world\""),
 			output: fmt.Errorf(""),
 		}, {
 			name:   "int64",
@@ -104,7 +104,7 @@ func TestPUnmarshal(t *testing.T) {
 		}, {
 			name:   "int64err",
 			obj:    NewInt64(0),
-			input:  []byte("hello world"),
+			input:  []byte("\"hello world\""),
 			output: fmt.Errorf(""),
 		}, {
 			name:   "uint8",
@@ -114,7 +114,7 @@ func TestPUnmarshal(t *testing.T) {
 		}, {
 			name:   "uint8err",
 			obj:    NewUint8(0),
-			input:  []byte("hello world"),
+			input:  []byte("\"hello world\""),
 			output: fmt.Errorf(""),
 		}, {
 			name:   "uint",
@@ -124,7 +124,7 @@ func TestPUnmarshal(t *testing.T) {
 		}, {
 			name:   "uinterr",
 			obj:    NewUint(0),
-			input:  []byte("hello world"),
+			input:  []byte("\"hello world\""),
 			output: fmt.Errorf(""),
 		}, {
 			name:   "uint64",
@@ -134,7 +134,7 @@ func TestPUnmarshal(t *testing.T) {
 		}, {
 			name:   "uint64err",
 			obj:    NewUint64(0),
-			input:  []byte("hello world"),
+			input:  []byte("\"hello world\""),
 			output: fmt.Errorf(""),
 		}, {
 			name:   "bool",
@@ -144,7 +144,7 @@ func TestPUnmarshal(t *testing.T) {
 		}, {
 			name:   "boolerr",
 			obj:    NewBool(false),
-			input:  []byte("hello world"),
+			input:  []byte("\"hello world\""),
 			output: fmt.Errorf(""),
 		},
 	}

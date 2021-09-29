@@ -327,9 +327,11 @@ func (app *App) addMiddleware(m *Middleware) error {
 	return nil
 }
 
-func (app *App) Apply(m *Middleware) error {
-	if err := app.addMiddleware(m); err != nil {
-		return wrapErr(err)
+func (app *App) Apply(ms ...*Middleware) error {
+	for _, m := range ms {
+		if err := app.addMiddleware(m); err != nil {
+			return wrapErr(err)
+		}
 	}
 	return nil
 }
