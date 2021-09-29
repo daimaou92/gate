@@ -305,6 +305,7 @@ func (ep *endpoint) handle(f func(string, httprouter.Handle)) {
 		}
 
 		var resBody []byte
+		err = nil
 		if resp != nil {
 			resBody, err = resp.Marshal()
 			if err != nil {
