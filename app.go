@@ -149,6 +149,7 @@ func New(ao AppOptions) (*App, error) {
 	app := &App{}
 	app.router = newRouter()
 	app.Handler = app.router
+	app.mwareIndex = map[string]int{}
 	app.FromServer(server)
 	app.UpdateInfo(ao.Info)
 
@@ -319,6 +320,9 @@ func (app *App) addMiddleware(m *Middleware) error {
 		return wrapErr(fmt.Errorf("invalid middleware"))
 	}
 	app.middlewares = append(app.middlewares, m)
+	if app.mwareIndex == nil {
+		app.mwareIndex = map[string]int{}
+	}
 	app.mwareIndex[m.ID] = len(app.middlewares) - 1
 	return nil
 }

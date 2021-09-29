@@ -13,15 +13,19 @@ import (
 
 func TestListen(t *testing.T) {
 	type tt struct {
-		name       string
-		ao         AppOptions
-		method     string
-		url        string
-		route      string
-		reqBody    Payload
-		handler    Handler
-		resBody    Payload
-		statusCode int
+		name               string
+		ao                 AppOptions
+		method             string
+		url                string
+		route              string
+		reqBody            Payload
+		handler            Handler
+		resBody            Payload
+		statusCode         int
+		middlewares        []*Middleware
+		excludeMiddlewares []string
+		testHeaderKey      string
+		testHeaderVal      []string
 	}
 
 	tsts := []tt{
@@ -145,6 +149,115 @@ func TestListen(t *testing.T) {
 				return NewString(r), nil
 			},
 			statusCode: StatusOK,
+		}, {
+			name:   "testMiddleware",
+			method: http.MethodGet,
+			url:    "http://localhost:12345/sarkar",
+			route:  "/:name",
+			ao: AppOptions{
+				Addr: ":12345",
+				Info: openapi3.Info{
+					Title:   "test api",
+					Version: "0.0.0",
+				},
+			},
+			handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
+				return NewString("yo"), nil
+			},
+			statusCode: StatusOK,
+			middlewares: []*Middleware{
+				{
+					ID: "setPinacolada",
+					Handler: func(h Handler) Handler {
+						return func(rc *RequestCtx, rd *RequestData) (Payload, error) {
+							res, err := h(rc, rd)
+							rc.ResponseWriter.Header().Set("pina", "colada")
+							return res, err
+						}
+					},
+				},
+			},
+			testHeaderKey: "pina",
+			testHeaderVal: []string{"colada"},
+		}, {
+			name:   "testMultiMiddleware",
+			method: http.MethodGet,
+			url:    "http://localhost:23456/sarkar",
+			route:  "/:name",
+			ao: AppOptions{
+				Addr: ":23456",
+				Info: openapi3.Info{
+					Title:   "test api",
+					Version: "0.0.0",
+				},
+			},
+			handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
+				return NewString("yo"), nil
+			},
+			statusCode: StatusOK,
+			middlewares: []*Middleware{
+				{
+					ID: "addPinaColada",
+					Handler: func(h Handler) Handler {
+						return func(rc *RequestCtx, rd *RequestData) (Payload, error) {
+							res, err := h(rc, rd)
+							rc.ResponseWriter.Header().Add("pina", "colada")
+							return res, err
+						}
+					},
+				}, {
+					ID: "addPinaFire",
+					Handler: func(h Handler) Handler {
+						return func(rc *RequestCtx, rd *RequestData) (Payload, error) {
+							res, err := h(rc, rd)
+							rc.ResponseWriter.Header().Add("pina", "fire")
+							return res, err
+						}
+					},
+				},
+			},
+			testHeaderKey: "pina",
+			testHeaderVal: []string{"fire", "colada"},
+		}, {
+			name:   "testExcludeMiddleware",
+			method: http.MethodGet,
+			url:    "http://localhost:34567/sarkar",
+			route:  "/:name",
+			ao: AppOptions{
+				Addr: ":34567",
+				Info: openapi3.Info{
+					Title:   "test api",
+					Version: "0.0.0",
+				},
+			},
+			handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
+				return NewString("yo"), nil
+			},
+			statusCode: StatusOK,
+			middlewares: []*Middleware{
+				{
+					ID: "addPinaColada",
+					Handler: func(h Handler) Handler {
+						return func(rc *RequestCtx, rd *RequestData) (Payload, error) {
+							res, err := h(rc, rd)
+							rc.ResponseWriter.Header().Add("pina", "colada")
+							return res, err
+						}
+					},
+				}, {
+					ID: "addPinaFire",
+					Handler: func(h Handler) Handler {
+						return func(rc *RequestCtx, rd *RequestData) (Payload, error) {
+							res, err := h(rc, rd)
+							rc.ResponseWriter.Header().Add("pina", "fire")
+							return res, err
+						}
+					},
+				},
+			},
+			excludeMiddlewares: []string{"addPinaFire"},
+			testHeaderKey:      "pina",
+			testHeaderVal:      []string{"colada"},
 		},
 	}
 
@@ -178,11 +291,16 @@ func TestListen(t *testing.T) {
 				args = append(args, tst.reqBody)
 			}
 			f(EndpointConfig{
-				Route:   tst.route,
-				Payload: NewEndpointPayload(args...),
-				Handler: tst.handler,
-				method:  tst.method,
+				Route:              tst.route,
+				Payload:            NewEndpointPayload(args...),
+				Handler:            tst.handler,
+				ExcludeMiddlewares: tst.excludeMiddlewares,
+				method:             tst.method,
 			})
+
+			for _, m := range tst.middlewares {
+				app.Apply(m)
+			}
 
 			// Start server
 			go func() {
@@ -231,6 +349,30 @@ func TestListen(t *testing.T) {
 
 				if !bytes.Equal(bsw, bs) {
 					t.Fatalf("wanted %s. got %s", bsw, bs)
+				}
+			}
+
+			if tst.testHeaderKey != "" {
+				if _, ok := res.Header[http.CanonicalHeaderKey(tst.testHeaderKey)]; !ok {
+					t.Fatalf("header key not present")
+				}
+			}
+
+			if len(tst.testHeaderVal) > 0 {
+				vs := res.Header[http.CanonicalHeaderKey(tst.testHeaderKey)]
+				if len(vs) != len(tst.testHeaderVal) {
+					t.Fatalf(
+						"lengths don't match. wanted: %d. Got %d",
+						len(tst.testHeaderVal), len(vs),
+					)
+				}
+				for i, v := range vs {
+					if tst.testHeaderVal[i] != v {
+						t.Fatalf(
+							"header val at index: %d did not match. wanted: %s. Got: %s\n",
+							i, tst.testHeaderVal[i], v,
+						)
+					}
 				}
 			}
 		})

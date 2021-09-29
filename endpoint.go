@@ -310,8 +310,8 @@ func (ep *endpoint) handle(f func(string, httprouter.Handle)) {
 				return
 			}
 
-			w.WriteHeader(StatusOK)
-			w.Write(resBody)
+			rc.ResponseWriter.WriteHeader(StatusOK)
+			rc.ResponseWriter.Write(resBody)
 		}
 	})
 }
