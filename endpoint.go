@@ -15,9 +15,6 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
-var requestBodyPool = map[string]sync.Pool{}
-var queryPool = map[string]sync.Pool{}
-
 var requestDataPool = sync.Pool{
 	New: func() interface{} {
 		return new(RequestData)
@@ -32,44 +29,42 @@ type endpoint struct {
 	queryPayload    Payload
 	responsePayload Payload
 	mexclusions     []string
+	requestPool     sync.Pool
+	queryPool       sync.Pool
 }
 
 func (ep *endpoint) initPools() {
 	if ep.requestPayload != nil {
-		if _, ok := requestBodyPool[ep.route]; !ok {
-			requestBodyPool[ep.route] = sync.Pool{
-				New: func() interface{} {
-					inpt := reflect.TypeOf(ep.requestPayload)
-					switch inpt.Kind() {
-					case reflect.Array, reflect.Chan,
-						reflect.Map, reflect.Ptr, reflect.Slice:
-						inpt = inpt.Elem()
-					}
-					val := reflect.ValueOf(ep.requestPayload)
-					v := reflect.New(inpt).Elem()
-					v.Set(val.Elem())
-					return v.Addr()
-				},
-			}
+		ep.requestPool = sync.Pool{
+			New: func() interface{} {
+				inpt := reflect.TypeOf(ep.requestPayload)
+				switch inpt.Kind() {
+				case reflect.Array, reflect.Chan,
+					reflect.Map, reflect.Ptr, reflect.Slice:
+					inpt = inpt.Elem()
+				}
+				val := reflect.ValueOf(ep.requestPayload)
+				v := reflect.New(inpt).Elem()
+				v.Set(val.Elem())
+				return v.Addr()
+			},
 		}
 	}
 
 	if ep.queryPayload != nil {
-		if _, ok := queryPool[ep.route]; !ok {
-			queryPool[ep.route] = sync.Pool{
-				New: func() interface{} {
-					inpt := reflect.TypeOf(ep.queryPayload)
-					switch inpt.Kind() {
-					case reflect.Array, reflect.Chan,
-						reflect.Map, reflect.Ptr, reflect.Slice:
-						inpt = inpt.Elem()
-					}
-					val := reflect.ValueOf(ep.queryPayload)
-					v := reflect.New(inpt).Elem()
-					v.Set(val.Elem())
-					return v.Addr()
-				},
-			}
+		ep.queryPool = sync.Pool{
+			New: func() interface{} {
+				inpt := reflect.TypeOf(ep.queryPayload)
+				switch inpt.Kind() {
+				case reflect.Array, reflect.Chan,
+					reflect.Map, reflect.Ptr, reflect.Slice:
+					inpt = inpt.Elem()
+				}
+				val := reflect.ValueOf(ep.queryPayload)
+				v := reflect.New(inpt).Elem()
+				v.Set(val.Elem())
+				return v.Addr()
+			},
 		}
 	}
 }
@@ -205,16 +200,11 @@ func (ep *endpoint) handle(f func(string, httprouter.Handle)) {
 
 		// Request Payload
 		if ep.requestPayload != nil {
-			pool, ok := requestBodyPool[ep.route]
-			if !ok {
-				panic(wrapErr(fmt.Errorf("route has defined request payload but no pool")))
-			}
-
-			pv := pool.Get()
+			pv := ep.requestPool.Get()
 			if pv == nil {
 				panic(wrapErr(fmt.Errorf("requestPayload Pool returned nil....aaaaaaaa")))
 			}
-			defer pool.Put(pv)
+			defer ep.requestPool.Put(pv)
 
 			v, ok := pv.(reflect.Value)
 			if !ok {
@@ -246,15 +236,12 @@ func (ep *endpoint) handle(f func(string, httprouter.Handle)) {
 
 		// Query Params
 		if ep.queryPayload != nil {
-			pool, ok := queryPool[ep.route]
-			if !ok {
-				panic(wrapErr(fmt.Errorf("route has defined request payload but no pool")))
-			}
-			pv := pool.Get()
+			pv := ep.queryPool.Get()
 			if pv == nil {
 				panic(wrapErr(fmt.Errorf("query pool returned empty....aaaaaaa")))
 			}
-			defer pool.Put(pv)
+			defer ep.queryPool.Put(pv)
+
 			v, ok := pv.(reflect.Value)
 			if !ok {
 				panic(wrapErr(fmt.Errorf("queryPool returned value of type not equal to reflect.Value")))
@@ -362,6 +349,48 @@ type EndpointConfig struct {
 	Payload            EndpointPayload
 	ExcludeMiddlewares []string
 	method             string
+}
+
+func NewEndpointConfig(route string, handler Handler) EndpointConfig {
+	return EndpointConfig{
+		Route:   route,
+		Handler: handler,
+	}
+}
+
+func (ec EndpointConfig) WithExclude(ms ...string) EndpointConfig {
+	ec.ExcludeMiddlewares = append(ec.ExcludeMiddlewares, ms...)
+	return ec
+}
+
+func (ec EndpointConfig) WithHandler(h Handler) EndpointConfig {
+	ec.Handler = h
+	return ec
+}
+
+func (ec EndpointConfig) WithPayload(ep EndpointPayload) EndpointConfig {
+	ec.Payload = ep
+	return ec
+}
+
+func (ec EndpointConfig) WithRoute(r string) EndpointConfig {
+	ec.Route = r
+	return ec
+}
+
+func (ec *EndpointConfig) applyMiddlerwares(ms []*Middleware) {
+	exm := map[string]bool{}
+	for _, s := range ec.ExcludeMiddlewares {
+		exm[s] = true
+	}
+
+	for i := len(ms) - 1; i >= 0; i-- {
+		m := ms[i]
+		if _, ok := exm[m.ID]; ok {
+			continue
+		}
+		ec.Handler = m.Handler(ec.Handler)
+	}
 }
 
 func (ec EndpointConfig) endpoint() *endpoint {

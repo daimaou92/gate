@@ -1,9 +1,9 @@
 package gate
 
 /*
-	Middlewares will be applied as 'Use'd
-	i.e. The first middleware to be used will be the
-	first one that is called on request, then the second
+	Middlewares will be called as 'Apply'ed
+	i.e. The first middleware to be added via a call to App.Apply()
+	will be the first one that is called on request, then the second
 	and so on - until finally the handler is called.
 */
 
@@ -12,13 +12,8 @@ type Middleware struct {
 	Handler func(Handler) Handler
 }
 
-var (
-	mwares []*Middleware
-	mindex = map[string]int{}
-)
-
-func (m Middleware) valid() bool {
-	if _, ok := mindex[m.ID]; ok || m.ID == "" {
+func (m Middleware) valid(app *App) bool {
+	if _, ok := app.mwareIndex[m.ID]; ok || m.ID == "" {
 		return false
 	}
 

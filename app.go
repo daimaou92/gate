@@ -13,6 +13,10 @@ import (
 	"github.com/julienschmidt/httprouter"
 )
 
+type epInit struct {
+	ec EndpointConfig
+	f  func(string, httprouter.Handle)
+}
 type App struct {
 	http.Server
 	router      *httprouter.Router
@@ -20,6 +24,7 @@ type App struct {
 	Info        *openapi3.Info
 	middlewares []*Middleware
 	mwareIndex  map[string]int
+	epCache     []epInit
 }
 
 type AppPanicHandler func(http.ResponseWriter, *http.Request, interface{})
@@ -219,37 +224,34 @@ func errorHandler(rc *RequestCtx, err error) error {
 	return nil
 }
 
-// var responseBodyPool = map[string]sync.Pool{}
+// Called before listen
+func (app *App) mountEndpoints() {
+	for _, v := range app.epCache {
+		v.ec.applyMiddlerwares(app.middlewares)
+		ep := v.ec.endpoint()
+		ep.handle(v.f)
+	}
+}
 
 func (app *App) registerEndpoint(
 	ec EndpointConfig,
 	f func(string, httprouter.Handle),
-) error {
-	// var payloadInputs []Payload
-	// if len(ps) > 0 {
-	// 	payloadInputs = append(payloadInputs, ps[0])
-	// }
-
-	// if len(ps) > 1 {
-	// 	payloadInputs = append(payloadInputs, ps[1])
-	// }
-
-	// if len(ps) > 2 {
-	// 	payloadInputs = append(payloadInputs, ps[2])
-	// }
-
-	ep := ec.endpoint()
+) {
+	app.epCache = append(app.epCache, epInit{
+		ec: ec,
+		f:  f,
+	})
+	// ep := ec.endpoint()
 	// ep.update(method, route, h, payloadInputs...)
-	ep.handle(f)
-	pi, err := ep.pathItem()
-	if err != nil {
-		return wrapErr(err)
-	}
-	app.paths[ec.Route] = pi
-	return nil
+	// ep.handle(f)
+	// pi, err := ep.pathItem()
+	// if err != nil {
+	// 	return wrapErr(err)
+	// }
+	// app.paths[ec.Route] = pi
 }
 
-type HandleFuncType func(EndpointConfig) error
+type HandleFuncType func(EndpointConfig)
 
 // HTTP Method specific handler registrations.
 // All route specific restrictions of httprouter apply
@@ -263,81 +265,65 @@ type HandleFuncType func(EndpointConfig) error
 // the url query unmarshaled to the QueryParams field
 // The third one, when exists, determines the response body type
 // It is recommended to provide the above types to generate a valid openapi schema
-func (app *App) Get(ec EndpointConfig) error {
+func (app *App) Get(ec EndpointConfig) {
 	ec.method = http.MethodGet
-	if err := app.registerEndpoint(
+	app.registerEndpoint(
 		ec, app.router.GET,
-	); err != nil {
-		return wrapErr(err)
-	}
-	return nil
+	)
 }
 
-func (app *App) Post(ec EndpointConfig) error {
-	if err := app.registerEndpoint(
+func (app *App) Post(ec EndpointConfig) {
+	ec.method = http.MethodPost
+	app.registerEndpoint(
 		ec, app.router.POST,
-	); err != nil {
-		return wrapErr(err)
-	}
-	return nil
+	)
 }
 
-func (app *App) Delete(ec EndpointConfig) error {
-	if err := app.registerEndpoint(
+func (app *App) Delete(ec EndpointConfig) {
+	ec.method = http.MethodDelete
+	app.registerEndpoint(
 		ec, app.router.DELETE,
-	); err != nil {
-		return wrapErr(err)
-	}
-	return nil
+	)
 }
 
-func (app *App) Put(ec EndpointConfig) error {
-	if err := app.registerEndpoint(
+func (app *App) Put(ec EndpointConfig) {
+	ec.method = http.MethodPut
+	app.registerEndpoint(
 		ec, app.router.PUT,
-	); err != nil {
-		return wrapErr(err)
-	}
-	return nil
+	)
 }
 
-func (app *App) Patch(ec EndpointConfig) error {
-	if err := app.registerEndpoint(
+func (app *App) Patch(ec EndpointConfig) {
+	ec.method = http.MethodPatch
+	app.registerEndpoint(
 		ec, app.router.PATCH,
-	); err != nil {
-		return wrapErr(err)
-	}
-	return nil
+	)
 }
 
-func (app *App) Options(ec EndpointConfig) error {
-	if err := app.registerEndpoint(
+func (app *App) Options(ec EndpointConfig) {
+	ec.method = http.MethodOptions
+	app.registerEndpoint(
 		ec, app.router.OPTIONS,
-	); err != nil {
-		return wrapErr(err)
-	}
-	return nil
+	)
 }
 
-func (app *App) Head(ec EndpointConfig) error {
-	if err := app.registerEndpoint(
+func (app *App) Head(ec EndpointConfig) {
+	ec.method = http.MethodHead
+	app.registerEndpoint(
 		ec, app.router.HEAD,
-	); err != nil {
-		return wrapErr(err)
-	}
-	return nil
+	)
 }
 
 func (app *App) addMiddleware(m *Middleware) error {
-	if !m.valid() {
+	if !m.valid(app) {
 		return wrapErr(fmt.Errorf("invalid middleware"))
 	}
 	app.middlewares = append(app.middlewares, m)
 	app.mwareIndex[m.ID] = len(app.middlewares) - 1
 	return nil
-
 }
 
-func (app *App) Use(m *Middleware) error {
+func (app *App) Apply(m *Middleware) error {
 	if err := app.addMiddleware(m); err != nil {
 		return wrapErr(err)
 	}
@@ -349,6 +335,7 @@ func (app *App) Listen() error {
 		return wrapErr(fmt.Errorf("app not initialized"))
 	}
 
+	app.mountEndpoints()
 	if app.TLSConfig != nil {
 		conn, err := net.Listen("tcp", app.Addr)
 		if err != nil {
