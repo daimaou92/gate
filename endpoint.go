@@ -31,15 +31,48 @@ type endpoint struct {
 	requestPayload  Payload
 	queryPayload    Payload
 	responsePayload Payload
+	mexclusions     []string
 }
 
-// var epPool sync.Pool
+func (ep *endpoint) initPools() {
+	if ep.requestPayload != nil {
+		if _, ok := requestBodyPool[ep.route]; !ok {
+			requestBodyPool[ep.route] = sync.Pool{
+				New: func() interface{} {
+					inpt := reflect.TypeOf(ep.requestPayload)
+					switch inpt.Kind() {
+					case reflect.Array, reflect.Chan,
+						reflect.Map, reflect.Ptr, reflect.Slice:
+						inpt = inpt.Elem()
+					}
+					val := reflect.ValueOf(ep.requestPayload)
+					v := reflect.New(inpt).Elem()
+					v.Set(val.Elem())
+					return v.Addr()
+				},
+			}
+		}
+	}
 
-// func init() {
-// 	epPool.New = func() interface{} {
-// 		return new(endpoint)
-// 	}
-// }
+	if ep.queryPayload != nil {
+		if _, ok := queryPool[ep.route]; !ok {
+			queryPool[ep.route] = sync.Pool{
+				New: func() interface{} {
+					inpt := reflect.TypeOf(ep.queryPayload)
+					switch inpt.Kind() {
+					case reflect.Array, reflect.Chan,
+						reflect.Map, reflect.Ptr, reflect.Slice:
+						inpt = inpt.Elem()
+					}
+					val := reflect.ValueOf(ep.queryPayload)
+					v := reflect.New(inpt).Elem()
+					v.Set(val.Elem())
+					return v.Addr()
+				},
+			}
+		}
+	}
+}
 
 func (ep endpoint) routeDetails() (string, []string) {
 	// qps := queryParams(ep.Payload)
@@ -84,77 +117,75 @@ func (ep endpoint) responseSchema() (openapi3.Schema, error) {
 
 // }
 
-func (ep *endpoint) update(
-	method, route string, h Handler,
-	ps ...Payload,
-) {
-	ep.method = method
-	ep.route = route
-	ep.handler = h
+// func (ep *endpoint) update(
+// 	ec EndpointConfig,
+// ) {
+// 	ep.method = ec.method
+// 	ep.route = ec.Route
+// 	ep.handler = ec.Handler
 
-	if len(ps) > 0 {
-		pl := ps[0]
-		if _, ok := requestBodyPool[route]; !ok {
-			requestBodyPool[route] = sync.Pool{
-				New: func() interface{} {
-					inpt := reflect.TypeOf(pl)
-					switch inpt.Kind() {
-					case reflect.Array, reflect.Chan,
-						reflect.Map, reflect.Ptr, reflect.Slice:
-						inpt = inpt.Elem()
-					}
-					val := reflect.ValueOf(pl)
-					v := reflect.New(inpt).Elem()
-					v.Set(val.Elem())
-					return v.Addr()
-				},
-			}
-		}
-		ep.requestPayload = pl
-	}
+// 	if len(ps) > 0 {
+// 		pl := ps[0]
+// 		if _, ok := requestBodyPool[route]; !ok {
+// 			requestBodyPool[route] = sync.Pool{
+// 				New: func() interface{} {
+// 					inpt := reflect.TypeOf(pl)
+// 					switch inpt.Kind() {
+// 					case reflect.Array, reflect.Chan,
+// 						reflect.Map, reflect.Ptr, reflect.Slice:
+// 						inpt = inpt.Elem()
+// 					}
+// 					val := reflect.ValueOf(pl)
+// 					v := reflect.New(inpt).Elem()
+// 					v.Set(val.Elem())
+// 					return v.Addr()
+// 				},
+// 			}
+// 		}
+// 		ep.requestPayload = pl
+// 	}
 
-	if len(ps) > 1 {
-		pl := ps[1]
-		if _, ok := queryPool[route]; !ok {
-			queryPool[route] = sync.Pool{
-				New: func() interface{} {
-					inpt := reflect.TypeOf(pl)
-					switch inpt.Kind() {
-					case reflect.Array, reflect.Chan,
-						reflect.Map, reflect.Ptr, reflect.Slice:
-						inpt = inpt.Elem()
-					}
-					val := reflect.ValueOf(pl)
-					v := reflect.New(inpt).Elem()
-					v.Set(val.Elem())
-					return v.Addr()
-				},
-			}
-		}
+// 	if len(ps) > 1 {
+// 		pl := ps[1]
+// 		if _, ok := queryPool[route]; !ok {
+// 			queryPool[route] = sync.Pool{
+// 				New: func() interface{} {
+// 					inpt := reflect.TypeOf(pl)
+// 					switch inpt.Kind() {
+// 					case reflect.Array, reflect.Chan,
+// 						reflect.Map, reflect.Ptr, reflect.Slice:
+// 						inpt = inpt.Elem()
+// 					}
+// 					val := reflect.ValueOf(pl)
+// 					v := reflect.New(inpt).Elem()
+// 					v.Set(val.Elem())
+// 					return v.Addr()
+// 				},
+// 			}
+// 		}
 
-		ep.queryPayload = pl
-	}
+// 		ep.queryPayload = pl
+// 	}
 
-	if len(ps) > 2 {
-		ep.responsePayload = ps[2]
-	}
-}
+// 	if len(ps) > 2 {
+// 		ep.responsePayload = ps[2]
+// 	}
+// }
 
-func (ep *endpoint) reset() {
-	ep.handler = nil
-	// ep.Payload = nil
-	ep.route = ""
-	ep.method = ""
-	ep.requestPayload = nil
-	ep.queryPayload = nil
-	ep.responsePayload = nil
-	// ep.typ = nil
-	// ep.val = reflect.Value{}
-}
+// func (ep *endpoint) reset() {
+// 	ep.handler = nil
+// 	// ep.Payload = nil
+// 	ep.route = ""
+// 	ep.method = ""
+// 	ep.requestPayload = nil
+// 	ep.queryPayload = nil
+// 	ep.responsePayload = nil
+// 	// ep.typ = nil
+// 	// ep.val = reflect.Value{}
+// }
 
 func (ep *endpoint) handle(f func(string, httprouter.Handle)) {
 	f(ep.route, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-
 		rd, ok := requestDataPool.Get().(*RequestData)
 		if !ok {
 			panic(wrapErr(fmt.Errorf("requestDataPool returned not *RequestData.... aaaaaaa")))
@@ -301,4 +332,48 @@ func (ep *endpoint) handle(f func(string, httprouter.Handle)) {
 func (ep *endpoint) pathItem() (*openapi3.PathItem, error) {
 	// TODO
 	return &openapi3.PathItem{}, nil
+}
+
+type EndpointPayload struct {
+	RequestPayload  Payload
+	QueryPayload    Payload
+	ResponsePayload Payload
+}
+
+func NewEndpointPayload(ps ...Payload) EndpointPayload {
+	var ep EndpointPayload
+	if len(ps) > 0 {
+		ep.RequestPayload = ps[0]
+	}
+
+	if len(ps) > 1 {
+		ep.QueryPayload = ps[1]
+	}
+
+	if len(ps) > 2 {
+		ep.ResponsePayload = ps[2]
+	}
+	return ep
+}
+
+type EndpointConfig struct {
+	Route              string
+	Handler            Handler
+	Payload            EndpointPayload
+	ExcludeMiddlewares []string
+	method             string
+}
+
+func (ec EndpointConfig) endpoint() *endpoint {
+	ep := &endpoint{
+		method:          ec.method,
+		route:           ec.Route,
+		handler:         ec.Handler,
+		requestPayload:  ec.Payload.RequestPayload,
+		queryPayload:    ec.Payload.QueryPayload,
+		responsePayload: ec.Payload.ResponsePayload,
+		mexclusions:     ec.ExcludeMiddlewares,
+	}
+	ep.initPools()
+	return ep
 }

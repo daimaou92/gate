@@ -15,9 +15,11 @@ import (
 
 type App struct {
 	http.Server
-	router *httprouter.Router
-	paths  openapi3.Paths
-	Info   *openapi3.Info
+	router      *httprouter.Router
+	paths       openapi3.Paths
+	Info        *openapi3.Info
+	middlewares []*Middleware
+	mwareIndex  map[string]int
 }
 
 type AppPanicHandler func(http.ResponseWriter, *http.Request, interface{})
@@ -220,35 +222,34 @@ func errorHandler(rc *RequestCtx, err error) error {
 // var responseBodyPool = map[string]sync.Pool{}
 
 func (app *App) registerEndpoint(
-	method, route string, h Handler,
+	ec EndpointConfig,
 	f func(string, httprouter.Handle),
-	ps ...Payload,
 ) error {
-	var payloadInputs []Payload
-	if len(ps) > 0 {
-		payloadInputs = append(payloadInputs, ps[0])
-	}
+	// var payloadInputs []Payload
+	// if len(ps) > 0 {
+	// 	payloadInputs = append(payloadInputs, ps[0])
+	// }
 
-	if len(ps) > 1 {
-		payloadInputs = append(payloadInputs, ps[1])
-	}
+	// if len(ps) > 1 {
+	// 	payloadInputs = append(payloadInputs, ps[1])
+	// }
 
-	if len(ps) > 2 {
-		payloadInputs = append(payloadInputs, ps[2])
-	}
+	// if len(ps) > 2 {
+	// 	payloadInputs = append(payloadInputs, ps[2])
+	// }
 
-	ep := new(endpoint)
-	ep.update(method, route, h, payloadInputs...)
+	ep := ec.endpoint()
+	// ep.update(method, route, h, payloadInputs...)
 	ep.handle(f)
 	pi, err := ep.pathItem()
 	if err != nil {
 		return wrapErr(err)
 	}
-	app.paths[route] = pi
+	app.paths[ec.Route] = pi
 	return nil
 }
 
-type HandleFuncType func(string, Handler, ...Payload) error
+type HandleFuncType func(EndpointConfig) error
 
 // HTTP Method specific handler registrations.
 // All route specific restrictions of httprouter apply
@@ -262,71 +263,82 @@ type HandleFuncType func(string, Handler, ...Payload) error
 // the url query unmarshaled to the QueryParams field
 // The third one, when exists, determines the response body type
 // It is recommended to provide the above types to generate a valid openapi schema
-func (app *App) Get(r string, h Handler, ps ...Payload) error {
+func (app *App) Get(ec EndpointConfig) error {
+	ec.method = http.MethodGet
 	if err := app.registerEndpoint(
-		http.MethodGet, r, h, app.router.GET,
-		ps...,
+		ec, app.router.GET,
 	); err != nil {
 		return wrapErr(err)
 	}
 	return nil
 }
 
-func (app *App) Post(r string, h Handler, ps ...Payload) error {
+func (app *App) Post(ec EndpointConfig) error {
 	if err := app.registerEndpoint(
-		http.MethodPost, r, h, app.router.POST,
-		ps...,
+		ec, app.router.POST,
 	); err != nil {
 		return wrapErr(err)
 	}
 	return nil
 }
 
-func (app *App) Delete(r string, h Handler, ps ...Payload) error {
+func (app *App) Delete(ec EndpointConfig) error {
 	if err := app.registerEndpoint(
-		http.MethodDelete, r, h, app.router.DELETE,
-		ps...,
+		ec, app.router.DELETE,
 	); err != nil {
 		return wrapErr(err)
 	}
 	return nil
 }
 
-func (app *App) Put(r string, h Handler, ps ...Payload) error {
+func (app *App) Put(ec EndpointConfig) error {
 	if err := app.registerEndpoint(
-		http.MethodPut, r, h, app.router.PUT,
-		ps...,
+		ec, app.router.PUT,
 	); err != nil {
 		return wrapErr(err)
 	}
 	return nil
 }
 
-func (app *App) Patch(r string, h Handler, ps ...Payload) error {
+func (app *App) Patch(ec EndpointConfig) error {
 	if err := app.registerEndpoint(
-		http.MethodPatch, r, h, app.router.PATCH,
-		ps...,
+		ec, app.router.PATCH,
 	); err != nil {
 		return wrapErr(err)
 	}
 	return nil
 }
 
-func (app *App) Options(r string, h Handler, ps ...Payload) error {
+func (app *App) Options(ec EndpointConfig) error {
 	if err := app.registerEndpoint(
-		http.MethodOptions, r, h, app.router.OPTIONS,
-		ps...,
+		ec, app.router.OPTIONS,
 	); err != nil {
 		return wrapErr(err)
 	}
 	return nil
 }
 
-func (app *App) Head(r string, h Handler, ps ...Payload) error {
+func (app *App) Head(ec EndpointConfig) error {
 	if err := app.registerEndpoint(
-		http.MethodHead, r, h, app.router.HEAD,
-		ps...,
+		ec, app.router.HEAD,
 	); err != nil {
+		return wrapErr(err)
+	}
+	return nil
+}
+
+func (app *App) addMiddleware(m *Middleware) error {
+	if !m.valid() {
+		return wrapErr(fmt.Errorf("invalid middleware"))
+	}
+	app.middlewares = append(app.middlewares, m)
+	app.mwareIndex[m.ID] = len(app.middlewares) - 1
+	return nil
+
+}
+
+func (app *App) Use(m *Middleware) error {
+	if err := app.addMiddleware(m); err != nil {
 		return wrapErr(err)
 	}
 	return nil

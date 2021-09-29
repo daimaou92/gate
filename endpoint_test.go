@@ -43,139 +43,119 @@ var (
 
 func TestEndpointHandle(t *testing.T) {
 	type tt struct {
-		name               string
-		route              string
-		url                string
-		method             string
-		handler            Handler
-		requestPayloadType Payload
-		requestPayload     Payload
-		queryPayloadType   Payload
-		router             *httprouter.Router
-		output             Payload
-		outStatus          int
+		name           string
+		ec             EndpointConfig
+		url            string
+		requestPayload Payload
+		output         Payload
+		outStatus      int
+		routerFunc     func(string, httprouter.Handle)
 	}
 
 	var port = 4444
-
-	getfunc := func(method string, router *httprouter.Router) func(string, httprouter.Handle) {
-		switch method {
-		case http.MethodGet:
-			return router.GET
-		case http.MethodPut:
-			return router.PUT
-		case http.MethodPost:
-			return router.POST
-		case http.MethodPatch:
-			return router.PATCH
-		case http.MethodOptions:
-			return router.OPTIONS
-		case http.MethodDelete:
-			return router.DELETE
-		case http.MethodHead:
-			return router.HEAD
-		default:
-			t.Fatalf("invalid method: %s", method)
-		}
-		return nil
-	}
+	router := httprouter.New()
 	tsts := []tt{
 		{
-			name:               "valid",
-			route:              "/:namevalid",
-			url:                fmt.Sprintf("http://localhost:%d/paul?key=value", port),
-			method:             http.MethodPost,
-			requestPayloadType: tstReqBody,
+			name: "valid",
+			ec: EndpointConfig{
+				Route:   "/1/:namevalid",
+				method:  http.MethodPost,
+				Payload: NewEndpointPayload(tstReqBody, tstQueryBody),
+				Handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
+					return &testPld{
+						Key:   "a",
+						Value: "b",
+					}, nil
+				},
+			},
+			routerFunc: router.POST,
+			url:        fmt.Sprintf("http://localhost:%d/1/paul?key=value", port),
 			requestPayload: &testPld{
 				Key:   "a",
 				Value: "b",
 			},
-			queryPayloadType: tstQueryBody,
-			handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
-				return &testPld{
-					Key:   "a",
-					Value: "b",
-				}, nil
-			},
-			router: httprouter.New(),
 			output: &testPld{
 				Key:   "a",
 				Value: "b",
 			},
 			outStatus: StatusOK,
 		}, {
-			name:               "Request Body Unmarshal Error",
-			route:              "/:namerbue",
-			url:                fmt.Sprintf("http://localhost:%d/paul?key=value", port),
-			method:             http.MethodPost,
-			requestPayloadType: tstReqBody,
-			requestPayload:     NewString("hi there"),
-			queryPayloadType:   tstQueryBody,
-			handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
-				return &testPld{
-					Key:   "a",
-					Value: "b",
-				}, nil
+			name: "Request Body Unmarshal Error",
+			ec: EndpointConfig{
+				Route:   "/2/:namerbue",
+				Payload: NewEndpointPayload(tstReqBody, tstQueryBody),
+				Handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
+					return &testPld{
+						Key:   "a",
+						Value: "b",
+					}, nil
+				},
+				method: http.MethodPost,
 			},
-			router:    httprouter.New(),
-			output:    nil,
-			outStatus: StatusBadRequest,
+			routerFunc:     router.POST,
+			url:            fmt.Sprintf("http://localhost:%d/2/paul?key=value", port),
+			requestPayload: NewString("hi there"),
+			output:         nil,
+			outStatus:      StatusBadRequest,
 		}, {
-			name:               "Request Body Missing Error",
-			route:              "/:namerbme",
-			url:                fmt.Sprintf("http://localhost:%d/paul?key=value", port),
-			method:             http.MethodPost,
-			requestPayloadType: tstReqBody,
-			queryPayloadType:   tstQueryBody,
-			handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
-				return &testPld{
-					Key:   "a",
-					Value: "b",
-				}, nil
+			name: "Request Body Missing Error",
+			ec: EndpointConfig{
+				Route:   "/3/:namerbme",
+				Payload: NewEndpointPayload(tstReqBody, tstQueryBody),
+				Handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
+					return &testPld{
+						Key:   "a",
+						Value: "b",
+					}, nil
+				},
+				method: http.MethodPost,
 			},
-			router:    httprouter.New(),
-			output:    nil,
-			outStatus: StatusBadRequest,
+			routerFunc: router.POST,
+			url:        fmt.Sprintf("http://localhost:%d/3/paul?key=value", port),
+			output:     nil,
+			outStatus:  StatusBadRequest,
 		}, {
-			name:               "Request Query Unmarshal Error",
-			route:              "/:idrque",
-			url:                fmt.Sprintf("http://localhost:%d/paul?key=value", port),
-			method:             http.MethodPost,
-			requestPayloadType: tstReqBody,
+			name: "Request Query Unmarshal Error",
+			ec: EndpointConfig{
+				Route:   "/4/:idrque",
+				Payload: NewEndpointPayload(tstReqBody, NewInt(0)),
+				Handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
+					log.Println(rd.QueryParams)
+					return &testPld{
+						Key:   "a",
+						Value: "b",
+					}, nil
+				},
+				method: http.MethodPost,
+			},
+			routerFunc: router.POST,
+			url:        fmt.Sprintf("http://localhost:%d/4/paul?key=value", port),
 			requestPayload: &testPld{
 				Key:   "a",
 				Value: "b",
 			},
-			queryPayloadType: NewInt(0),
-			handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
-				log.Println(rd.QueryParams)
-				return &testPld{
-					Key:   "a",
-					Value: "b",
-				}, nil
-			},
-			router:    httprouter.New(),
 			output:    nil,
 			outStatus: StatusBadRequest,
 		}, {
-			name:               "Request Query Empty Error",
-			route:              "/:identifierrqee",
-			url:                fmt.Sprintf("http://localhost:%d/paul", port),
-			method:             http.MethodPost,
-			requestPayloadType: tstReqBody,
+			name: "Request Query Empty Error",
+			ec: EndpointConfig{
+				Route:   "/5/:identifierrqee",
+				Payload: NewEndpointPayload(tstReqBody, tstQueryBody),
+				Handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
+					log.Println(rd.QueryParams)
+					return &testPld{
+						Key:   "a",
+						Value: "b",
+					}, nil
+				},
+				method: http.MethodPost,
+			},
+			routerFunc: router.POST,
+			url:        fmt.Sprintf("http://localhost:%d/5/paul", port),
 			requestPayload: &testPld{
 				Key:   "a",
 				Value: "b",
 			},
-			queryPayloadType: tstQueryBody,
-			handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
-				log.Println(rd.QueryParams)
-				return &testPld{
-					Key:   "a",
-					Value: "b",
-				}, nil
-			},
-			router:    httprouter.New(),
 			output:    nil,
 			outStatus: StatusBadRequest,
 		},
@@ -183,20 +163,12 @@ func TestEndpointHandle(t *testing.T) {
 
 	for _, tst := range tsts {
 		t.Run(tst.name, func(t *testing.T) {
-			ep := &endpoint{}
-			var ps []Payload
-			if tst.requestPayloadType != nil {
-				ps = append(ps, tst.requestPayloadType)
-			}
+			ep := tst.ec.endpoint()
+			ep.handle(tst.routerFunc)
 
-			if tst.queryPayloadType != nil {
-				ps = append(ps, tst.queryPayloadType)
-			}
-			ep.update(tst.method, tst.route, tst.handler, ps...)
-			ep.handle(getfunc(tst.method, tst.router))
 			server := &http.Server{
 				Addr:    fmt.Sprintf(":%d", port),
-				Handler: tst.router,
+				Handler: router,
 			}
 			go func() {
 				if err := server.ListenAndServe(); err != nil {
@@ -211,9 +183,9 @@ func TestEndpointHandle(t *testing.T) {
 			)
 			if tst.requestPayload != nil {
 				bs, _ := tst.requestPayload.Marshal()
-				req, err = http.NewRequest(tst.method, tst.url, bytes.NewBuffer(bs))
+				req, err = http.NewRequest(tst.ec.method, tst.url, bytes.NewBuffer(bs))
 			} else {
-				req, err = http.NewRequest(tst.method, tst.url, nil)
+				req, err = http.NewRequest(tst.ec.method, tst.url, nil)
 			}
 			if err != nil {
 				server.Shutdown(context.TODO())

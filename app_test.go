@@ -177,7 +177,12 @@ func TestListen(t *testing.T) {
 			if tst.reqBody != nil {
 				args = append(args, tst.reqBody)
 			}
-			f(tst.route, tst.handler, args...)
+			f(EndpointConfig{
+				Route:   tst.route,
+				Payload: NewEndpointPayload(args...),
+				Handler: tst.handler,
+				method:  tst.method,
+			})
 
 			// Start server
 			go func() {
