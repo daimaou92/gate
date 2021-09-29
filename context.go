@@ -59,12 +59,19 @@ func init() {
 }
 
 type ResponseWriter struct {
-	rw      http.ResponseWriter
-	written bool
+	rw         http.ResponseWriter
+	written    bool
+	statusCode int
+	mu         sync.Mutex
 }
 
 func (rw *ResponseWriter) Write(bs []byte) (int, error) {
+	rw.mu.Lock()
+	defer rw.mu.Unlock()
 	rw.written = true
+	if rw.statusCode == 0 {
+		rw.statusCode = http.StatusOK
+	}
 	i, err := rw.rw.Write(bs)
 	if err != nil {
 		return 0, wrapErr(err)
@@ -72,12 +79,15 @@ func (rw *ResponseWriter) Write(bs []byte) (int, error) {
 	return i, nil
 }
 
-func (rw ResponseWriter) Header() http.Header {
+func (rw *ResponseWriter) Header() http.Header {
 	return rw.rw.Header()
 }
 
 func (rw *ResponseWriter) WriteHeader(statusCode int) {
+	rw.mu.Lock()
+	defer rw.mu.Unlock()
 	rw.rw.WriteHeader(statusCode)
+	rw.statusCode = statusCode
 	rw.written = true
 }
 
@@ -97,6 +107,11 @@ func (rc *RequestCtx) update(rw http.ResponseWriter, r *http.Request) {
 func (rc *RequestCtx) Reset() {
 	rc.Request = nil
 	rc.ResponseWriter = nil
+}
+
+// Will return 0 until Write or Writeheader is called
+func (rc *RequestCtx) StatusCode() int {
+	return rc.ResponseWriter.statusCode
 }
 
 func (rc *RequestCtx) IP() string {
