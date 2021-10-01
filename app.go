@@ -336,6 +336,50 @@ func (app *App) Apply(ms ...*Middleware) error {
 	return nil
 }
 
+func (app *App) SetGlobalOptionsHandler(h Handler) {
+	app.router.GlobalOPTIONS = http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rc := RequestCtx{
+			ResponseWriter: &ResponseWriter{
+				rw: rw,
+			},
+			Request: r,
+		}
+
+		rd := RequestData{
+			Params: httprouter.ParamsFromContext(r.Context()),
+		}
+		if len(r.URL.RawQuery) > 0 {
+			qp := QueryPayload(r.URL.Query())
+			rd.QueryParams = &qp
+		}
+
+		res, err := h(&rc, &rd)
+		if err != nil {
+			if err := errorHandler(&rc, err); err != nil {
+				log.Println(wrapErr(err))
+			}
+			return
+		}
+
+		if rc.ResponseWriter.written {
+			return
+		}
+
+		var bs []byte
+		if res != nil {
+			bs, err = res.Marshal()
+			if err != nil {
+				if err := errorHandler(&rc, err); err != nil {
+					log.Println(wrapErr(err))
+				}
+				return
+			}
+		}
+		rc.ResponseWriter.WriteHeader(StatusOK)
+		rc.ResponseWriter.Write(bs)
+	})
+}
+
 func (app *App) Listen() error {
 	if app == nil || app.router == nil {
 		return wrapErr(fmt.Errorf("app not initialized"))
