@@ -17,7 +17,7 @@ func TestListen(t *testing.T) {
 		ao                 AppOptions
 		method             string
 		url                string
-		route              string
+		path               string
 		reqBody            Payload
 		handler            Handler
 		resBody            Payload
@@ -33,7 +33,7 @@ func TestListen(t *testing.T) {
 			name:   http.MethodGet,
 			method: http.MethodGet,
 			url:    "http://localhost:5050/sarkar",
-			route:  "/:name",
+			path:   "/:name",
 			ao: AppOptions{
 				Addr: ":5050",
 				Info: openapi3.Info{
@@ -57,7 +57,7 @@ func TestListen(t *testing.T) {
 			name:   http.MethodPost,
 			method: http.MethodPost,
 			url:    "http://localhost:4747/sarkar",
-			route:  "/:name",
+			path:   "/:name",
 			ao: AppOptions{
 				Addr: ":4747",
 				Info: openapi3.Info{
@@ -81,7 +81,7 @@ func TestListen(t *testing.T) {
 			name:   http.MethodPatch,
 			method: http.MethodPatch,
 			url:    "http://localhost:2987/sarkar",
-			route:  "/:name",
+			path:   "/:name",
 			ao: AppOptions{
 				Addr: ":2987",
 				Info: openapi3.Info{
@@ -105,7 +105,7 @@ func TestListen(t *testing.T) {
 			name:   http.MethodPut,
 			method: http.MethodPut,
 			url:    "http://localhost:8678/sarkar",
-			route:  "/:name",
+			path:   "/:name",
 			ao: AppOptions{
 				Addr: ":8678",
 				Info: openapi3.Info{
@@ -129,7 +129,7 @@ func TestListen(t *testing.T) {
 			name:   http.MethodDelete,
 			method: http.MethodDelete,
 			url:    "http://localhost:9999/sarkar",
-			route:  "/:name",
+			path:   "/:name",
 			ao: AppOptions{
 				Addr: ":9999",
 				Info: openapi3.Info{
@@ -153,7 +153,7 @@ func TestListen(t *testing.T) {
 			name:   "testMiddleware",
 			method: http.MethodGet,
 			url:    "http://localhost:12345/sarkar",
-			route:  "/:name",
+			path:   "/:name",
 			ao: AppOptions{
 				Addr: ":12345",
 				Info: openapi3.Info{
@@ -183,7 +183,7 @@ func TestListen(t *testing.T) {
 			name:   "testMultiMiddleware",
 			method: http.MethodGet,
 			url:    "http://localhost:23456/sarkar",
-			route:  "/:name",
+			path:   "/:name",
 			ao: AppOptions{
 				Addr: ":23456",
 				Info: openapi3.Info{
@@ -222,7 +222,7 @@ func TestListen(t *testing.T) {
 			name:   "testExcludeMiddleware",
 			method: http.MethodGet,
 			url:    "http://localhost:34567/sarkar",
-			route:  "/:name",
+			path:   "/:name",
 			ao: AppOptions{
 				Addr: ":34567",
 				Info: openapi3.Info{
@@ -291,7 +291,7 @@ func TestListen(t *testing.T) {
 				args = append(args, tst.reqBody)
 			}
 			f(EndpointConfig{
-				Route:              tst.route,
+				Path:               tst.path,
 				Payload:            NewEndpointPayload(args...),
 				Handler:            tst.handler,
 				ExcludeMiddlewares: tst.excludeMiddlewares,

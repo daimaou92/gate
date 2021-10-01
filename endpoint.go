@@ -23,7 +23,7 @@ var requestDataPool = sync.Pool{
 
 type endpoint struct {
 	method          string
-	route           string
+	path            string
 	handler         Handler
 	requestPayload  Payload
 	queryPayload    Payload
@@ -69,13 +69,13 @@ func (ep *endpoint) initPools() {
 	}
 }
 
-func (ep endpoint) routeDetails() (string, []string) {
+func (ep endpoint) pathDetails() (string, []string) {
 	// qps := queryParams(ep.Payload)
-	params := pathParams(ep.route)
+	params := pathParams(ep.path)
 	if len(params) == 0 {
-		return ep.route, nil
+		return ep.path, nil
 	}
-	r := ep.route
+	r := ep.path
 	for i, param := range params {
 		fr := fmt.Sprintf("{%s}", strings.Trim(strings.Replace(param, ":", "", 1), "/"))
 		r = strings.Replace(r, param, fr, 1)
@@ -180,7 +180,7 @@ func (ep endpoint) responseSchema() (openapi3.Schema, error) {
 // }
 
 func (ep *endpoint) handle(f func(string, httprouter.Handle)) {
-	f(ep.route, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	f(ep.path, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 		rd, ok := requestDataPool.Get().(*RequestData)
 		if !ok {
 			panic(wrapErr(fmt.Errorf("requestDataPool returned not *RequestData.... aaaaaaa")))
@@ -349,16 +349,16 @@ func NewEndpointPayload(ps ...Payload) EndpointPayload {
 }
 
 type EndpointConfig struct {
-	Route              string
+	Path               string
 	Handler            Handler
 	Payload            EndpointPayload
 	ExcludeMiddlewares []string
 	method             string
 }
 
-func NewEndpointConfig(route string, handler Handler) EndpointConfig {
+func NewEndpointConfig(path string, handler Handler) EndpointConfig {
 	return EndpointConfig{
-		Route:   route,
+		Path:    path,
 		Handler: handler,
 	}
 }
@@ -378,8 +378,8 @@ func (ec EndpointConfig) WithPayload(ep EndpointPayload) EndpointConfig {
 	return ec
 }
 
-func (ec EndpointConfig) WithRoute(r string) EndpointConfig {
-	ec.Route = r
+func (ec EndpointConfig) WithPath(p string) EndpointConfig {
+	ec.Path = p
 	return ec
 }
 
@@ -401,7 +401,7 @@ func (ec *EndpointConfig) applyMiddlerwares(ms []*Middleware) {
 func (ec EndpointConfig) endpoint() *endpoint {
 	ep := &endpoint{
 		method:          ec.method,
-		route:           ec.Route,
+		path:            ec.Path,
 		handler:         ec.Handler,
 		requestPayload:  ec.Payload.RequestPayload,
 		queryPayload:    ec.Payload.QueryPayload,

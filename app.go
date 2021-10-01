@@ -255,7 +255,7 @@ func (app *App) registerEndpoint(
 type HandleFuncType func(EndpointConfig)
 
 // HTTP Method specific handler registrations.
-// All route specific restrictions of httprouter apply
+// All path specific restrictions of httprouter apply
 // The ps (Payload) variadic input at the end can accept upto 3 objects
 // The first one, when exists, determines the request body type
 // When provided the RequestData struct received in the handler will have

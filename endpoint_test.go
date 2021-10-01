@@ -58,7 +58,7 @@ func TestEndpointHandle(t *testing.T) {
 		{
 			name: "valid",
 			ec: EndpointConfig{
-				Route:   "/1/:namevalid",
+				Path:    "/1/:namevalid",
 				method:  http.MethodPost,
 				Payload: NewEndpointPayload(tstReqBody, tstQueryBody),
 				Handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
@@ -82,7 +82,7 @@ func TestEndpointHandle(t *testing.T) {
 		}, {
 			name: "Request Body Unmarshal Error",
 			ec: EndpointConfig{
-				Route:   "/2/:namerbue",
+				Path:    "/2/:namerbue",
 				Payload: NewEndpointPayload(tstReqBody, tstQueryBody),
 				Handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
 					return &testPld{
@@ -100,7 +100,7 @@ func TestEndpointHandle(t *testing.T) {
 		}, {
 			name: "Request Body Missing Error",
 			ec: EndpointConfig{
-				Route:   "/3/:namerbme",
+				Path:    "/3/:namerbme",
 				Payload: NewEndpointPayload(tstReqBody, tstQueryBody),
 				Handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
 					return &testPld{
@@ -117,7 +117,7 @@ func TestEndpointHandle(t *testing.T) {
 		}, {
 			name: "Request Query Unmarshal Error",
 			ec: EndpointConfig{
-				Route:   "/4/:idrque",
+				Path:    "/4/:idrque",
 				Payload: NewEndpointPayload(tstReqBody, NewInt(0)),
 				Handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
 					log.Println(rd.QueryParams)
@@ -139,7 +139,7 @@ func TestEndpointHandle(t *testing.T) {
 		}, {
 			name: "Request Query Empty Error",
 			ec: EndpointConfig{
-				Route:   "/5/:identifierrqee",
+				Path:    "/5/:identifierrqee",
 				Payload: NewEndpointPayload(tstReqBody, tstQueryBody),
 				Handler: func(rc *RequestCtx, rd *RequestData) (Payload, error) {
 					log.Println(rd.QueryParams)
