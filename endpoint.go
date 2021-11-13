@@ -316,6 +316,7 @@ func (ep *endpoint) handle(f func(string, httprouter.Handle)) {
 				return
 			}
 		}
+		rc.ResponseWriter.Header().Set("Content-Type", resp.ContentType().String())
 		rc.ResponseWriter.WriteHeader(StatusOK)
 		rc.ResponseWriter.Write(resBody)
 	})
