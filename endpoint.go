@@ -112,73 +112,6 @@ func (ep endpoint) responseSchema() (openapi3.Schema, error) {
 
 // }
 
-// func (ep *endpoint) update(
-// 	ec EndpointConfig,
-// ) {
-// 	ep.method = ec.method
-// 	ep.route = ec.Route
-// 	ep.handler = ec.Handler
-
-// 	if len(ps) > 0 {
-// 		pl := ps[0]
-// 		if _, ok := requestBodyPool[route]; !ok {
-// 			requestBodyPool[route] = sync.Pool{
-// 				New: func() interface{} {
-// 					inpt := reflect.TypeOf(pl)
-// 					switch inpt.Kind() {
-// 					case reflect.Array, reflect.Chan,
-// 						reflect.Map, reflect.Ptr, reflect.Slice:
-// 						inpt = inpt.Elem()
-// 					}
-// 					val := reflect.ValueOf(pl)
-// 					v := reflect.New(inpt).Elem()
-// 					v.Set(val.Elem())
-// 					return v.Addr()
-// 				},
-// 			}
-// 		}
-// 		ep.requestPayload = pl
-// 	}
-
-// 	if len(ps) > 1 {
-// 		pl := ps[1]
-// 		if _, ok := queryPool[route]; !ok {
-// 			queryPool[route] = sync.Pool{
-// 				New: func() interface{} {
-// 					inpt := reflect.TypeOf(pl)
-// 					switch inpt.Kind() {
-// 					case reflect.Array, reflect.Chan,
-// 						reflect.Map, reflect.Ptr, reflect.Slice:
-// 						inpt = inpt.Elem()
-// 					}
-// 					val := reflect.ValueOf(pl)
-// 					v := reflect.New(inpt).Elem()
-// 					v.Set(val.Elem())
-// 					return v.Addr()
-// 				},
-// 			}
-// 		}
-
-// 		ep.queryPayload = pl
-// 	}
-
-// 	if len(ps) > 2 {
-// 		ep.responsePayload = ps[2]
-// 	}
-// }
-
-// func (ep *endpoint) reset() {
-// 	ep.handler = nil
-// 	// ep.Payload = nil
-// 	ep.route = ""
-// 	ep.method = ""
-// 	ep.requestPayload = nil
-// 	ep.queryPayload = nil
-// 	ep.responsePayload = nil
-// 	// ep.typ = nil
-// 	// ep.val = reflect.Value{}
-// }
-
 func (ep *endpoint) handle(f func(string, httprouter.Handle)) {
 	f(ep.path, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 		rd, ok := requestDataPool.Get().(*RequestData)
@@ -315,17 +248,17 @@ func (ep *endpoint) handle(f func(string, httprouter.Handle)) {
 				}
 				return
 			}
+			rc.ResponseWriter.Header().Set("Content-Type", resp.ContentType().String())
 		}
-		rc.ResponseWriter.Header().Set("Content-Type", resp.ContentType().String())
 		rc.ResponseWriter.WriteHeader(StatusOK)
 		rc.ResponseWriter.Write(resBody)
 	})
 }
 
-func (ep *endpoint) pathItem() (*openapi3.PathItem, error) {
-	// TODO
-	return &openapi3.PathItem{}, nil
-}
+// func (ep *endpoint) pathItem() (*openapi3.PathItem, error) {
+// 	// TODO
+// 	return &openapi3.PathItem{}, nil
+// }
 
 type EndpointPayload struct {
 	RequestPayload  Payload
