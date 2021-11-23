@@ -220,7 +220,7 @@ func (ep *endpoint) handle(f func(string, httprouter.Handle)) {
 			panic(`rcpool returned something thats not a RequestCtx... aaaaaaaaa!!`)
 		}
 		defer func() {
-			rc.Reset()
+			rc.reset()
 			rcPool.Put(rc)
 		}()
 		rc.update(w, r)

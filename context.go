@@ -91,6 +91,12 @@ func (rw *ResponseWriter) WriteHeader(statusCode int) {
 	rw.written = true
 }
 
+func NewResponseWriter(w http.ResponseWriter) *ResponseWriter {
+	return &ResponseWriter{
+		rw: w,
+	}
+}
+
 type RequestCtx struct {
 	Request        *http.Request
 	ResponseWriter *ResponseWriter
@@ -104,7 +110,7 @@ func (rc *RequestCtx) update(rw http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (rc *RequestCtx) Reset() {
+func (rc *RequestCtx) reset() {
 	rc.Request = nil
 	rc.ResponseWriter = nil
 }
