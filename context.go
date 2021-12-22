@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/goccy/go-json"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -40,11 +41,41 @@ func (dp NoPayload) Marshal() ([]byte, error) {
 	return nil, nil
 }
 
+type Pagination struct {
+	Page       int32 `json:"page"`
+	ItemCount  int8  `json:"item_count"`
+	TotalItems int32 `json:"total_items"`
+	Pages      int32 `json:"pages"`
+	HasNext    bool  `json:"has_next"`
+}
+
+func (p Pagination) Marshal() ([]byte, error) {
+	bs, err := json.Marshal(p)
+	if err != nil {
+		return nil, wrapErr(err, "json marshal failed")
+	}
+	return bs, nil
+}
+
+func (p *Pagination) Unmarshal(src []byte) error {
+	var t Pagination
+	if err := json.Unmarshal(src, &t); err != nil {
+		return wrapErr(err, "json unmarshal failed")
+	}
+	*p = t
+	return nil
+}
+
+func (Pagination) ContentType() ContentType {
+	return ContentTypeJSON
+}
+
 type RequestData struct {
 	Params      httprouter.Params
 	Body        Payload
 	QueryParams Payload
 	Custom      map[string]interface{}
+	Page        int32
 }
 
 type Handler func(*RequestCtx, *RequestData) (Payload, error)
