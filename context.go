@@ -75,7 +75,6 @@ type RequestData struct {
 	Body        Payload
 	QueryParams Payload
 	Custom      map[string]interface{}
-	Page        int32
 }
 
 type Handler func(*RequestCtx, *RequestData) (Payload, error)
