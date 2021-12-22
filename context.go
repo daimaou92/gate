@@ -1,6 +1,7 @@
 package gate
 
 import (
+	"context"
 	"log"
 	"net/http"
 	"net/url"
@@ -120,6 +121,13 @@ func (rc *RequestCtx) StatusCode() int {
 	return rc.ResponseWriter.statusCode
 }
 
+// Returns the underlying *http.Request.Context
+func (rc *RequestCtx) Context() context.Context {
+	return rc.Request.Context()
+}
+
+// Tries it's best to find the real IP of the client. The header precedence
+// from highest to lowest is 'Forwarded' > 'X-Forwarded-For' > 'X-Real-IP'
 func (rc *RequestCtx) IP() string {
 	r := rc.Request
 	var (
