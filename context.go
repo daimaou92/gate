@@ -1,8 +1,11 @@
 package gate
 
 import (
+	"bufio"
 	"context"
+	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -120,6 +123,40 @@ func (rw *ResponseWriter) WriteHeader(statusCode int) {
 	rw.rw.WriteHeader(statusCode)
 	rw.statusCode = statusCode
 	rw.written = true
+}
+
+func (rw *ResponseWriter) Flush() {
+	rw.mu.Lock()
+	defer rw.mu.Unlock()
+
+	f, ok := rw.rw.(http.Flusher)
+	if !ok {
+		panic(wrapErr(fmt.Errorf("responseWriter is not a flusher")))
+	}
+	f.Flush()
+}
+
+func (rw *ResponseWriter) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	rw.mu.Lock()
+	defer rw.mu.Unlock()
+
+	h, ok := rw.rw.(http.Hijacker)
+	if !ok {
+		return nil, nil, wrapErr(fmt.Errorf("ResponseWriter is not a Hijacker"))
+	}
+	return h.Hijack()
+}
+
+func (rw *ResponseWriter) Push(target string, opts *http.PushOptions) error {
+	rw.mu.Lock()
+	defer rw.mu.Unlock()
+
+	p, ok := rw.rw.(http.Pusher)
+	if !ok {
+		return wrapErr(fmt.Errorf("ResponseWriter is not a Pusher"))
+	}
+
+	return p.Push(target, opts)
 }
 
 func NewResponseWriter(w http.ResponseWriter) *ResponseWriter {
