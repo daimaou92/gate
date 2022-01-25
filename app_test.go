@@ -261,6 +261,7 @@ func TestListen(t *testing.T) {
 		},
 	}
 
+	type HandleFuncType func(EndpointConfig)
 	for _, tst := range tsts {
 		t.Run(tst.name, func(t *testing.T) {
 			app, err := New(tst.ao)
