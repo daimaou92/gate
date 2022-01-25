@@ -254,18 +254,6 @@ func (app *App) registerEndpoint(
 
 type HandleFuncType func(EndpointConfig)
 
-// HTTP Method specific handler registrations.
-// All path specific restrictions of httprouter apply
-// The ps (Payload) variadic input at the end can accept upto 3 objects
-// The first one, when exists, determines the request body type
-// When provided the RequestData struct received in the handler will have
-// request.Body unmarshaled to the Body field.
-// request.Body will hence be empty
-// The second one, when exists, determines the query parameter type
-// When provided the RequestData struct received in the handler will have
-// the url query unmarshaled to the QueryParams field
-// The third one, when exists, determines the response body type
-// It is recommended to provide the above types to generate a valid openapi schema
 func (app *App) Get(ec EndpointConfig) {
 	ec.method = http.MethodGet
 	app.registerEndpoint(
