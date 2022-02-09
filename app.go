@@ -281,6 +281,13 @@ func (app *App) registerEndpoint(
 	// app.paths[ec.Route] = pi
 }
 
+// func (app *App) openapi() {
+// 	for _, v := range app.epCache {
+// 		p, params := v.ec.endpoint().pathDetails()
+
+// 	}
+// }
+
 // Add a GET endpoint
 func (app *App) Get(ec EndpointConfig) {
 	ec.method = http.MethodGet

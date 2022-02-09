@@ -24,6 +24,9 @@ var requestDataPool = sync.Pool{
 type endpoint struct {
 	method          string
 	path            string
+	summary         string
+	description     string
+	operationID     string
 	handler         Handler
 	requestPayload  Payload
 	queryPayload    Payload
@@ -105,12 +108,20 @@ func (ep endpoint) responseSchema() (openapi3.Schema, error) {
 	return s, nil
 }
 
-// func (ep endpoint) generatePathItem() {
-// 	op := openapi3.NewOperation()
-// 	op.OperationID = ep.route
-// 	formattedRoute, params, queryParams := ep.routeDetails()
+func (ep endpoint) generatePathItem() (*openapi3.PathItem, error) {
+	// formattedRoute, params := ep.pathDetails()
+	// pi := &openapi3.PathItem{
+	// 	Summary:     ep.summary,
+	// 	Description: ep.description,
+	// }
 
-// }
+	// op := openapi3.NewOperation()
+	// if op.OperationID == "" {
+	// 	op.OperationID = ep.path
+	// }
+
+	return nil, wrapErr(fmt.Errorf("TODO: daimaou92"))
+}
 
 func (ep *endpoint) handle(f func(string, httprouter.Handle)) {
 	f(ep.path, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -287,6 +298,9 @@ type EndpointConfig struct {
 	Handler            Handler
 	Payload            EndpointPayload
 	ExcludeMiddlewares []string
+	Summary            string
+	Description        string
+	OperationID        string
 	method             string
 }
 
@@ -337,6 +351,9 @@ func (ec EndpointConfig) endpoint() *endpoint {
 		method:          ec.method,
 		path:            ec.Path,
 		handler:         ec.Handler,
+		summary:         ec.Summary,
+		description:     ec.Description,
+		operationID:     ec.OperationID,
 		requestPayload:  ec.Payload.RequestPayload,
 		queryPayload:    ec.Payload.QueryPayload,
 		responsePayload: ec.Payload.ResponsePayload,
