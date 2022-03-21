@@ -1,22 +1,37 @@
 # Gate
 
 ---
+
 ### This is alpha grade software
+
 ---
 
 Opinionated lib based on [httprouter](https://github.com/julienschmidt/httprouter) to build REST APIs.
 
 ## Usage
+
 ---
 
-A cardinal goal I have with this library is to be able to spit put [OpenAPI](https://www.openapis.org) definitions automagically. To do that I need to know a few things explicitly:
-1. The endpoint
-2. The request payload and its `content-type` if any
-3. the query payload if any
-4. the response payload and its `content-type` if any
-5. A title and version for the API
+Using `Gate` is a little different than most other frameworks. Using it correctly
+requires that one decide the request, response and query payload while designing
+an API to the maximum extent feasible. When explicitly defined, as in the example
+below, and later fetched using the `Gate` provided attribute - one is saving
+on re-allocations.
 
-While `Gate` does not generate any documentation yet - the groundwork for it has been laid in the way you use it.
+`Gate` maintains a pool of all the structures explicitly provided when writing
+the endpoints. These pools are used to reflect back a pre-allocated value,
+when present, in the argument of type `RequestData` later received in the handler.
+
+## Open API
+
+---
+
+Using `Gate` as intended lets us generate an OpenAPI based doc right from your code.
+Work is underway to achieve this. This feature is inspired by [Dropshot](https://github.com/oxidecomputer/dropshot).
+
+## Example
+
+---
 
 Here's how a POST request looks in Gate
 
@@ -119,8 +134,9 @@ Now simply use CURL to verify:
 `curl -d '""' -H 'Content-Type: application/json' -X POST http://localhost:8080/yolofy`
 
 You should see `"YOLO"` as output.
-The quotes are needed and exist in the response since it's a JSON string.
 
 ---
+
 ### This documentation like the whole project is also a WIP. It should be updated as soon as I have more time. Thank you for your patience 🙏
+
 ---
