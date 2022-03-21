@@ -43,7 +43,7 @@ import (
 	"encoding/json"
 	"log"
 
-	"github.com/enalk-com/gate"
+	"github.com/daimaou92/gate"
 	"github.com/getkin/kin-openapi/openapi3"
 )
 
