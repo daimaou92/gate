@@ -21,6 +21,7 @@ on re-allocations.
 `Gate` maintains a pool of all the structures explicitly provided when writing
 the endpoints. These pools are used to reflect back a pre-allocated value,
 when present, in the argument of type `RequestData` later received in the handler.
+Fresh allocation occurs if needed. More on golang sync pools [here](https://pkg.go.dev/sync#Pool)
 
 ## Open API
 
